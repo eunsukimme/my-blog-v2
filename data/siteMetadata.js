@@ -8,7 +8,7 @@ const siteMetadata = {
   siteUrl: 'https://tailwind-nextjs-starter-blog.vercel.app', // TODO:
   siteRepo: 'https://github.com/eunsukimme/my-blog-v2',
   siteLogo: '/static/images/logo.png', // TODO:
-  image: '/static/images/avatar.png', // TODO:
+  image: '/static/images/avatar-me.jpg',
   socialBanner: '/static/images/twitter-card.png',
   email: 'eunsu.dev@gmail.com',
   github: 'https://github.com/eunsukimme',
