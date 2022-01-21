@@ -1,0 +1,73 @@
+---
+title: Quantile, Quartile, Percentile 개념 정리
+summary: 데이터를 동등한 크기로 분할하는 헷갈리기 쉬운 개념들을 정리해봅시다
+date: '2019-11-01T22:50:00.000Z'
+draft: false
+slug: 'understanding-quantile-quartile-and-percentile'
+category: Data Science
+tags:
+  - TIL
+  - Python
+  - Data Science
+  - SciPy
+  - Numpy
+---
+
+# Quantile
+
+Quantile이란 주어진 데이터를 동등한 크기로 분할하는 지점을 말합니다. 예를 들어, 시험을 치고 상위 10%에 속하는지를 확인하고 싶다면 점수 데이터를 정렬한 뒤 데이터의 수를 10개의 동등한 크기, 즉 각 그룹이 같은 데이터 수를 보유하도로 분할하면 됩니다.
+
+<img src="https://s3.amazonaws.com/codecademy-content/courses/statistics/quantiles/deciles.svg" />
+
+위 그림에서는 10개의 그룹으로 나누기 위해 9개의 수직선을 그렸고, 각 그룹에는 3개의 데이터가 포함됩니다. 위 같이 10개로 분할한 경우는 특수한 경우로 10-quantile 혹은 deciles라고 부릅니다.
+
+Numpy라이브러리에서는 quantile을 쉽게 계산할 수 있도록 하는 `quantile()` 메서드를 제공합니다. `quantile()` 메서드는 두 파라미터를 취하는데, 첫 파라미터로는 데이터셋. 두 번째는 `0` 과 `1` 사이의 숫자로 구성된 배열을 갖습니다. 이 숫자는 데이터를 분할하고자 하는 분위 수 입니다.
+
+만약 처음(하위) 20%, 40%, 60%, 80% 지점을 구하고자 한다면 다음과 같이 코드를 작성할 수 있습니다.
+
+```python
+import numpy as np
+
+dataset = [5, 10, -20, 42, -9, 10]
+ten_percent = np.quantile(dataset, [0.2, 0.4, 0.6, 0.8])
+```
+
+즉 데이터를 20%씩 동등 분할하는 지점을 반환합니다.
+
+<img src="https://s3.amazonaws.com/codecademy-content/courses/statistics/quantiles/even.svg" />
+
+# Quartile
+
+Quartile은 데이터를 4 등분하는 지점을 말합니다. 즉, 데이터를 25%씩 동등 분할한 지점을 말합니다. 이 때 상위 75% 지점을 `Q1`, 상위 50% 지점을 `Q2`, 그리고 상위 25% 지점을 `Q3` 라고 합니다. `Q2` 는 데이터의 중간값과 동일합니다.
+
+<img src="https://s3.amazonaws.com/codecademy-content/courses/statistics/quantiles/quartiles.svg" />
+
+## Interquantile Range
+
+Interquantile Range(IQR)이란 `Q3` 와 `Q1` 과의 간격을 말합니다. 즉, 데이터의 50%가 존재하는 공간입니다. 이 공간은 outliers의 영향을 적게 받는 공간이기 때문에 robust한 통계 입니다.
+
+SciPy에서는 IQR을 쉽게 계산할 수 있도록 `iqr()` 이란 메서드를 제공합니다. 파라미터로는 데이터셋을 넘겨주면 됩니다.
+
+```python
+from scipy.stats import iqr
+
+dataset = [4, 10, 38, 85, 193]
+interquartile_range = iqr(dataset)
+```
+
+# Percentile
+
+Percentile은 데이터를 100등분하는 지점을 말합니다. 보통 흔히 상위 몇%라고 말할때 주로 사용하는게 바로 이 percentile입니다.
+
+# Review
+
+지금까지 헷갈리기 쉬운 개념인 Quantile과 특수한 경우인 Quartile, Percentile에 대해서 알아보았습니다. 이번 포스팅에서 배운 내용을 정리하면 다음과 같습니다.
+
+- Quantiles are values that split a dataset into groups of equal size.
+- If you have `n` quantiles, the dataset will be split into `n+1`groups of equal size.
+- The median is a quantile. It is the only 2-quantile. Half the data falls below the median and half falls above the median.
+- Quartiles and percentiles are other common quantiles. Quartiles split the data into 4 groups while percentiles split the data into 100 groups.
+
+# References
+
+- [Codecademy](http://www.codecademy.com)

@@ -1,0 +1,304 @@
+---
+title: KNN(K-Nearest Neighbors) 알고리즘 개념정리
+summary: K 번째 이웃을 찾는 KNN 알고리즘에 대해서 알아봅시다
+date: '2019-10-20T14:00:00.000Z'
+draft: false
+slug: 'understanding-KNN'
+category: Machine Learning
+tags:
+  - TIL
+  - Machine Learning
+  - Python
+---
+
+K-Nearest Neightbors(KNN)은 classification 알고리즘 중 하나입니다. 핵심은 비슷한 속성(카테고리)을 갖는 데이터끼리 가까이에 위치한다는 것입니다.
+
+<img
+  width="680"
+  src="https://s3.amazonaws.com/codecademy-content/courses/learn-knn/nearest_neighbor.gif"
+/>
+
+위 그림은 좌표축에서 흰 점을 중심으로 이웃한 점의 갯수를 K라고 하고, 이를 1부터 5까지 늘려나가고 있습니다. 동시에 인접한 점의 색깔에 따라서 흰 점에게 부여할 수 있는 색을 예측하고 있습니다. 이웃한 점의 갯수가 2가지는 Green 이라고 예측하지만, 5가 되었을 때는 Red로 예측하게 됩니다. 이웃한 점의 갯수 중 빨간 점의 갯수가 더 많아지기 때문입니다.
+
+이것이 바로 KNN의 핵심 아이디어 입니다. 만약 class가 이미 분류된 특정 데이터셋을 보유하고 있다면, class가 분류되지 않은 새로운 데이터를 현재 데이터셋과 비교하여 분류할 수 있게 됩니다. 가장 가까운 이웃을 찾아냄으로써 말이죠.
+
+# Introduction
+
+KNN 알고리즘에 대한 이해를 돕기 위해 한 가지 예시를 들어봅시다. 영화 데이터셋으로 예를 들면, 영화 데이터 포인트, 즉 각 영화에 대한 feature로는 영화의 상영 시간, 그리고 촬영에 든 예산이 있을 수 있습니다.
+
+이렇게 두 feature를 활용한다면 영화 데이터를 2차원 공간상에 나타낼 수 있습니다. 또한 feature로는 연속적인 값이 아닌 boolean feature가 있을 수 있습니다. Black 또는 White 영화인지를 나타내는 feature가 True, False 값을 가질 수 있고 감독이 Stanley Kubrick이냐 아니냐에 따라서 True, False 값을 가질 수도 있습니다.
+
+이번 포스팅에서는 영화의 러닝 타임, 제작된 연도, 투입된 예산 정보를 가지고 IMDb rating이 7.0을 넘느냐 못 넘느냐에 따라서 'good' 또는 'bad'로 classify 하는 KNN 알고리즘을 작성해보도록 하곘습니다. 데이터셋과 레이블의 모양은 다음과 같습니다.
+
+```python
+# 데이터셋은 다음과 같은 형태의 JSON 파일입니다
+# '영화 제목': [정규화된 투입된 예산, 정규화된 러닝 타임, 정규화된 제작 연도] 값을 key-value로 가집니다
+'''
+{
+  'Mountain': [0.0011460670664191085, 0.3310580204778157, 0.8764044943820225],
+  'Clueless': [0.000982340650333614, 0.20477815699658702, 0.7640449438202247],
+  'Far from Heaven': [0.0011051354623977348, 0.23890784982935154, 0.8426966292134831]
+}
+'''
+# 레이블은 각 영화가 IMDb 평점 7.0을 넘느냐에 따라 1(good, 넘김)과 0(bad, 못 넘김)으로 분리한 JSON 파일입니다
+# '영화 제목': 'IMDb 평점 7.0 넘김 여부' 값을 key-value로 가집니다
+'''
+{
+  'The Gallows': 0,
+  'Hollywood Shuffle': 1,
+  'The Lost Skeleton of Cadavra': 1,
+}
+'''
+from movies import movie_dataset, movie_labels
+```
+
+# Distance Between Points
+
+KNN 알고리즘에서 특정 데이터 포인트의 가까운 이웃을 알기 위해선 먼저 특정 데이터 포인트로부터 각각의 데이터 포인트까지에 대한 거리를 계산해야 합니다. 만약 _Star Wars_ 의 러닝타임이 125분, 제작 연도가 1977년이고 _Raiders of the Lost Ark_ 의 러닝타임이 115분, 제작 연도가 1981년이라면 두 영화간의 거리는 어떻게 계산할 수 있을까요? 공식은 다음과 같습니다.
+
+$$\sqrt {(125 - 115)^2 + (1977 - 1981)^2} = 10.77$$
+
+그러나 위와 같이 러닝 타임과 연도만으로 두 영화 사이의 거리를 측정하는 것은 아무래도 약간 제한적입니다. 많은 변수들이 존재할 수 있기 때문이죠. 만약 새로운 변수가 추가되어서 2차원이 아닌 3차원 상에서 데이터간의 거리를 측정해야할 떄는 어떻게 계산할 수 있을까요? 또 3차원을 넘어서 N차원 상의 점들 사이의 거리는 어떻게 계산할 수 있을까요? N차원 상의 점 사이의 거리를 계산하는 일반화된 공식은 다음과 같습니다.
+
+$$\sqrt{(A_1 - B_1)^2 + (A_2 - B_2)^2 + \cdots + (A_n - B_n)^2}$$
+
+위 공식을 이용하여, 우리는 N차원의 점의 K-Nearest Neighbors를 찾을 수 있습니다.
+
+## Python code
+
+영화 정보를 담고 있는 두 배열을 받아서 거리를 계산한 후 이를 반환하는 `distance()` 함수를 python 코드로 구현해 보면 다음과 같습니다.
+
+```python
+# movie1과 movie2는 [투입된 예산, 러닝 타임, 제작 연도] 을 저장하는 배열입니다
+def distance(movie1, movie2):
+  distance = sum([ (movie1[i] - movie2[i])**2 for i in range(len(movie1))]) ** 0.5
+  return distance
+```
+
+# Normalization
+
+일반적으로 KNN알고리즘의 계산 순서는 다음과 같습니다.
+
+1. **Normalize the data**
+2. Find the `k` nearest neighbors
+3. Classify the new point based on those neighbors
+
+만약 영화를 제작하는데 투입되는 예산을 feature로 활용한다면, 데이터에 문제가 발생할 수 있습니다. 영화 제작 연도 feature는 최대값과 최소값의 차이가 단지 125년 밖에 되지 않는데, 영화 제작 예산은 몇 백만 달러가 될 수 있기 떄문입니다.
+
+이는 거리 계산 공식이 모든 차원을 동등하게 다루기 때문에 발생합니다. 각 차원의 스케일을 고려하지 않기 때문이죠. 만약 두 영화간의 제작 연도가 70년이 차이가 난다면 이는 꽤 큰 차이입니다. 그러나 지금으로선 이는 영화 제작에 투입된 예산이 70달러 밖에 차이가 나지 않는 것과 동일한 영향을 미칩니다. 제작 연도가 1년 차이나는 것이 투입된 에산 1달러 차이나는 것과 같은 것이죠... 좀 말이 안되는 것 같습니다.
+
+이러한 문제를 해결하기 위해선 데이터를 Normalization(정규화)할 필요가 있습니다. 이번 포스팅에서는 모든 값들이 0과 1사이에 오도록 만드는 min-max normalization을 활용하도록 하겠습니다.
+
+## Python code
+
+min-max normalization을 python 코드로 구현해 보면 다음과 같습니다.
+
+```python
+# 정규화하고자 하는 값을 지닌 배열을 인자로 받습니다
+def min_max_normalize(lst):
+  minimum, maximum  = [min(lst), max(lst)]
+  normalized = []
+  for value in lst:
+    # 각 value를 정규화한 값을 normalized에 추가합니다
+    normalized.append((value - minimum) / (maximum - minimum))
+
+  return normalized	# 정규화된 배열을 반환합니다
+```
+
+# Finding the Nearest Neighbors
+
+이제 KNN 알고리즘에 필요한 순서는 다음과 같습니다.
+
+1. Normalize the data
+2. **Find the `k` nearest neighbors**
+3. Classify the new point based on those neighbors
+
+이제 우리는 데이터간 거리를 측정하고 정규화하는 방법을 알게 되었으니 임의의 데이터를 분류할 수 있습니다. 이를 위해선 먼저 임의의 데이터와 가장 가까운 `k` 개의 이웃을 찾아야 합니다. 일단 `k` 를 5라고 해봅시다.
+
+가까운 5개의 이웃을 찾기 위해선, 임의이 unknown데이터와 다른 모든 데이터간의 거리를 비교해야합니다. 즉, unknown데이터와 다른 각각의 데이터에 대해 거리를 다 계산해야 한다는 것입니다. 우리는 궁극적으로 각 영화와 해당 영화와의 거리를 정렬한 배열을 얻을 것입니다.
+
+```python
+[
+  [0.30, 'Superman II'],
+  [0.31, 'Finding Nemo'],
+  ...
+  ...
+  [0.38, 'Blazing Saddles']
+]
+```
+
+위의 예에서는 임의의 unknown영화와 Superman II 와의 거리는 0.3 입니다.
+
+## Python code
+
+임의의 unknown 데이터와 모든 데이터 포인트와의 거리를 계산하고, 이를 정렬하여 가장 가까운 `k` 개의 이웃을 반환하는 함수 `classify()` 를 python 코드로 구현해 보면 다음과 같습니다.
+
+```python
+def classify(unknown, dataset, k):
+  distances = []
+  for title in dataset:
+    # [unknown 데이터와 특정 영화와의 거리, 영화 제목] 을 distances 배열에 추가합니다
+    distances.append([distance(unknown, dataset[title]), title])
+  distances.sort()	# 거리를 기준으로 distances 배열을 정렬합니다
+
+  return distances[:k]	# 가장 가까운 k 개의 neighbors를 반환합니다
+```
+
+# Count Neighbors
+
+이제 KNN 알고리즘에 필요한 순서는 다음과 같습니다.
+
+1. Normalize the data
+2. Find the `k` nearest neighbors
+3. **Classify the new point based on those neighbors**
+
+가장 가까운 `k` 개의 이웃을 구했으니, 이웃 영화의 평점에 따라 unknown영화가 'good' 인지 'bad' 인지 분류해 보도록 합시다. 과반수를 넘는 결과를 따라가게 하고, 만약 `k` 가 짝수여서 'good' 과 'bad' 가 1대1 로 나온다면 이 때 unknown 데이터를 어떻게 결정할지 추가적인 로직이 필요하게 됩니다. 여러 로직이 존재하지만, 이 경우엔 가장 가까운 점의 클래스를 부여할 수 있습니다.
+
+## Python code
+
+위에서 작성한 `classify()` 함수를 마저 작성해서 neighbors에 따라 class를 분류하다록 합시다. 이 때 이웃에 대한 labels이 필요하니 이를 파라미터로 받을 수 있도록 추가해줍시다.
+
+```python
+# 세 번째 파라미터로 labels를 추가합니다
+def classify(unknown, dataset, labels, k):
+  distances = []
+  for title in dataset:
+    # [unknown 데이터와 특정 영화와의 거리, 영화 제목] 을 distances 배열에 추가합니다
+    distances.append([distance(unknown, dataset[title]), title])
+  distances.sort()	# 거리를 기준으로 distances 배열을 정렬합니다
+  # ---추가---
+  neighbors = distances[:k]	# 가장 가까운 k개의 이웃을 neightbors에 저장합니다
+  num_good, num_bad = [0, 0]	# 이웃의 good, bad 여부를 세는 변수를 선언합니다
+  for neighbor in neighbors:
+    title = neighbor[1]
+    if labels[title] == 1:	# 만약 이웃 영화가 good 이라면
+      num_good += 1	# num_good 을 1 증가시킵니다
+     else labels[title] == 0:	# 만약 이웃 영화가 bad 라면
+      num_bad += 0	# num_bad 를 1 증가시킵니다
+
+  return 1 if num_good > num_bad else 0
+```
+
+# Classify Your Favorite Movie
+
+자, 이제 좋아하는 영화로 테스트를 해봅시다. 저는 2017년에 제작된 _Call Me By Your Name_ 이란 영화로 테스트하도록 하겠습니다. 먼저 해당 영화가 데이터셋에 포함되어 있는지 확인해봅시다.
+
+```python
+print('Call Me By Your Name' in movie_dataset)	# False
+```
+
+다행히 테스트 하려는 영화는 데이터셋에 포함되어 있지 않습니다. 이제 이 unknown 데이터가 어떻게 분류될 지 알아봅시다. _Call Me By Your Name_ 은 러닝 타임이 132분이고, 2017년에 제작되었으며 총 350,000 달러가 투입되었습니다. 이 영화의 각 feature값들을 정규화한 뒤 `my_movie` 에 저장합시다.
+
+```python
+my_movie = min_max_normalize([350000, 132, 2017])
+```
+
+이제 해당 영화를 classify 해봅시다. 이 때 `k` 값은 5로 설정해봅시다.
+
+```python
+print(classify(normalized_my_movie, movie_dataset, movie_labels, 5))	# 1
+```
+
+결과가 1로 나왔습니다. 즉, 이 영화는 IMDb 평점이 7.0 보다 높을 것으로 예상되었습니다. 그런데 이 알고리즘을 믿을 수 있는 것일까요?
+
+# Training and Validation Sets
+
+우리가 위에서 작성한 알고리즘이 과연 얼마나 정확한지 알아볼 필요가 있습니다. 그러기 위해선 우리가 가지고 있는 데이터셋을 training set과 validation/test set으로 나누어야 합니다.
+
+그런 다음, validation set의 각 데이터를 KNN 알고리즘의 입력으로 전달하고, 모든 training set의 데이터와의 거리를 구한 뒤, K Nearest Neighbors를 구합니다. 마지막으로 해당 결과를 바탕으로 validation set의 데이터의 class를 predict한 뒤, validation set의 label과 비교함으로써 얼마나 올바르게 측정하였는지 validation_accuracy를 계산할 것입니다.
+
+## Python code
+
+먼저, 이미 training_set과 validation_set이 나누어져 있다고 가정합시다. validation_set의 데이터를 얼마나 잘 예측하였는지를 나타내는 validation_accuracy를 계산하는 함수 `find_validation_accuracy()` 를 작성해봅시다.
+
+```python
+# 모든 validation set 데이터에 대래서 올바르게 분류한 데이터의 갯수를
+# 모든 validation set 데이터의 개수로 나눈 값을 반환합니다
+def find_validation_accuracy(training_set, training_labels, validation_set, validation_labels, k):
+  num_correct = 0.0
+
+  for title in validation_set:
+    movie = validation_set[title]
+    guess = classify(movie, training_set, training_labels, k)
+    if(guess == validation_labels[title]):
+      num_correct += 1
+
+  return num_correct / len(validation_set)
+```
+
+# Graph of K
+
+아래의 그림은 `k` 에 따라 validation accuracy가 어떻게 변하는지를 나타내고 있습니다.
+
+<img width="500" src="https://s3.amazonaws.com/codecademy-content/courses/learn-knn/k.png" />
+
+`k` 가 너무 낮으면 데이터에 overfitting 되고, 반대로 `k` 가 너무 높으면 데이터를 잘 학습하지 못해 underfitting 됩니다. 위 경우에선 k가 75일 때 제일 좋은 성능을 보이는 것 같습니다.
+
+# Using sklearn
+
+위에서 구현한 모든 내용을 `sklearn` 에서 포함하고 있습니다. `sklearn` 은 ML을 위한 메서드를 제공하는 Python 라이브러리입니다. KNN을 적용하기 위해선 `KNeighborsClassifier` 객체를 불러와야 합니다. 그런 다음 `k` 값을 설정해 주어야 하는데, 이는 `n_neighbors` 옵션으로 지정할 수 있습니다.
+
+```python
+classifier = KNeighborsClassifier(n_neighbors = 3)
+```
+
+그런 다음, 우리의 classifier를 학습시켜야 합니다. `.fit()` 메서드에 두 파라미터로 training_set 과 training_label을 넘겨주면 됩니다.
+
+```python
+training_points = [
+  [0.5, 0.2, 0.1],
+  [0.9, 0.7, 0.3],
+  [0.4, 0.5, 0.7]
+]
+
+training_labels = [0, 1, 1]
+classifier.fit(training_points, training_labels)
+```
+
+마지막으로, 학습을 시킨 뒤 `.predict()` 메서드에 파라미터로 test_set을 넘겨주어 unknown 데이터를 classify 할 수 있습니다.
+
+```python
+unknown_points = [
+  [0.2, 0.1, 0.7],
+  [0.4, 0.7, 0.6],
+  [0.5, 0.8, 0.1]
+]
+
+guesses = classifier.predict(unknown_points
+```
+
+이제 우리가 지금껏 작성한 코드를 `sklearn` 으로 implement 해봅시다.
+
+```python
+from movies import movie_dataset, labels
+from sklearn.neighbors import KNeighborsClassifier
+
+classifier = KNeighborsClassifier(n_neighbors = 5)
+classifier.fit(movie_dataset, labels)
+
+print(classifier.predict(
+  [
+    [.45, .2, .5],
+    [.25, .8, .9],
+    [.1, .1, .9]
+  ]
+))	# 1 1 0
+```
+
+# Review
+
+지금까지 K-Nearest Neighbors 알고리즘에 대해서 알아보았습니다. 이번 포스팅에서 배운 내용을 정리하면 다음과 같습니다.
+
+- Data with `n` features can be conceptualized as points lying in n-dimensional space.
+- Data points can be compared by using the distance formula. Data points that are similar will have a smaller distance between them.
+- A point with an unknown class can be classified by finding the `k` nearest neighbors
+- To verify the effectiveness of a classifier, data with known classes can be split into a training set and a validation set. Validation error can then be calculated.
+- Classifiers have parameters that can be tuned to increase their effectiveness. In the case of K-Nearest Neighbors, `k` can be changed.
+- A classifier can be trained improperly and suffer from overfitting or underfitting. In the case of K-Nearest Neighbors, a low `k` often leads to overfitting and a large `k` often leads to underfitting.
+- Python’s sklearn library can be used for many classification and machine learning algorithms.
+
+그런데 여기서 한가지 재밌는 사실, KNN으로 classification 뿐만 아니라 regression 문제도 풀 수 있다는 걸 아시나요?😳 다음 포스팅에서는 KNN으로 regression 하는 방법에 대해서 작성하도록 하겠습니다 :)
+
+# References
+
+- [Codecademy](http://www.codecademy.com)

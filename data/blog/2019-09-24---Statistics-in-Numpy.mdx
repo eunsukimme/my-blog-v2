@@ -1,0 +1,180 @@
+---
+title: Statistics in Numpy
+summary: Numpy를 활용하여 확률분포에 대해서 알아봅시다
+date: '2019-09-24T00:00:00.000Z'
+draft: false
+slug: 'statistics-in-numpy'
+category: Data Science
+tags:
+  - TIL
+  - Python
+  - Data Science
+  - Numpy
+---
+
+# 히스토그램(Histogram)
+
+히스토그램은 다음과 같은 데이터의 특서을 빠르게 파악하고자 할 때 사용할 수 있습니다.
+
+- 특정 값이 다른 것들보다 더 많이 나타나는지?
+- 데이터의 범위가 어떻게 되는지(i.e. 최대, 최소값)?
+- 이상치가 존재하는지?
+
+또한 특정 값이 몇 개가 있는지 아는 것 보다 특정 범위의 값이 몇 개가 있는지에 더 관심을 둘 수도 있습니다. 이러한 구간 혹은 그룹을 히스토그램에서는 _bins_ 이라고 합니다.
+
+또한 데이터의 전체 범위가 아닌 특정 범위에 관심이 있다면 해당 범위를 보여지게 설정할 수 있습니다. 이러한 관심 범위를 히스토그램에서는 _range_ 라고 합니다.
+
+Python 으로는 Matplotlib 라이브러리를 활용하여 다음과 깉이 히스토그램을 그릴 수 있습니다.
+
+```python
+from matplotlib import pyplot as plt
+
+d = [1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 5, 5]
+
+plt.hist(d, bins=5, range=(1, 6))
+plt.show()
+```
+
+<img
+  width="583"
+  alt="Screen Shot 2019-09-24 at 7 24 42 PM"
+  src="https://user-images.githubusercontent.com/31213226/65505452-37c48500-df04-11e9-96fe-c07d461a1b8d.png"
+/>
+
+# Different Types of Distributions
+
+히스토그램은 그래프의 모양에 따라서 그 종류를 구분할 수 있습니다. 한 가지 방법은 _peaks_ 의 수를 세어서 구분하는 것입니다.
+
+1. _peaks_ 1 개 - Unimodal Distribution
+
+<img
+  src="https://s3.amazonaws.com/codecademy-content/courses/numpy/distribution_type_i/unimodal_new.svg"
+  alt=""
+/>
+
+2. _peaks_ 2 개 - Bimodal Distribution
+
+<img
+  src="https://s3.amazonaws.com/codecademy-content/courses/numpy/distribution_type_i/bimodal_new.svg"
+  alt=""
+/>
+
+3. _peaks_ 3 개 이상 - Multimodal Distribution
+
+<img
+  src="https://s3.amazonaws.com/codecademy-content/courses/numpy/distribution_type_i/multimodal_new.svg"
+  alt=""
+/>
+
+4. _peaks_ 없음 - Uniform Distribution
+
+<img
+  src="https://s3.amazonaws.com/codecademy-content/courses/numpy/distribution_type_i/uniform_new.svg"
+  alt=""
+/>
+
+*peaks*가 1 개인 Unimodal 의 경우 데이터와 *peaks*와의 관련에 따라 그 종류를 구분할 수 있습니다.
+
+1. Symmetric: *peaks*를 중심으로 데이터가 대칭을 이룹니다
+
+<img
+  src="https://s3.amazonaws.com/codecademy-content/courses/learn-pandas/distribution-types-ii-symmetric-noline.svg"
+  alt=""
+/>
+
+2. Skew-Right: peaks 가 왼쪽으로 치우쳐져 있습니다. 즉 히스토그램이 오른쪽으로 긴 꼬리를 내립니다.
+
+<img
+  src="https://s3.amazonaws.com/codecademy-content/courses/learn-pandas/distribution-types-ii-skew-right-noline.svg"
+  alt=""
+/>
+
+3. Skew-Left: *peaks*가 오른쪽으로 치우쳐져 있습니다. 즉 히스토그램이 왼쪽으로 긴 꼬리를 내립니다.
+
+<img
+  src="https://s3.amazonaws.com/codecademy-content/courses/learn-pandas/distribution-types-ii-skew-left-noline.svg"
+  alt=""
+/>
+
+# 정규분포(Normal Distribution)
+
+Normal Distribution 은 정규분포로 Symmetric, Unimodal Distribution 입니다. 다음과 같은 경우들은 Normal Distribution 을 따릅니다.
+
+- 사람들의 평균 키
+- 사람들의 혈압 수치
+
+Normal Distribution 은 평균(mean)과 표준편차(standard deviation)로 정의됩니다. 평균은 distribution 의 'middle'이며, 표준편차는 'width'라고 이해할 수 있습니다. 표준편차가 클 수록 distribution 이 퍼지기 때문입니다.
+
+<img
+  src="https://s3.amazonaws.com/codecademy-content/courses/numpy/normal_distribution.svg"
+  alt=""
+/>
+
+Numpy 의 `np.random.normal` 함수를 활용하면 normal distribution 을 따르는 난수를 생성할 수 있습니다. 위 함수는 다음 파라미터를 취합니다.
+
+- **loc:** 정규분포의 평균(mean)
+- **scale:** 정규분포의 표준편차(standard deviation)
+- **size:** 난수 생성 횟수
+
+```python
+from matplotlib import pyplot as plt
+import numpy as np
+
+a = np.random.normal(0, 1, size=100000)
+
+plt.hist(a, bins=100)
+plt.show()
+```
+
+위 코드는 다음과 같은 정규분포를 생성합니다.
+
+<img
+  width="587"
+  alt="Screen Shot 2019-09-24 at 7 36 45 PM"
+  src="https://user-images.githubusercontent.com/31213226/65505603-8bcf6980-df04-11e9-8c84-85fa439f3f5b.png"
+/>
+
+# Standard Deviations and Normal Distribution
+
+평균으로부터 특정 표준편차만큼의 구간은 특정 양의 데이터가 분포합니다.
+
+- **68%** of our samples will fall between +/- 1 standard deviation of the mean
+- **95%** of our samples will fall between +/- 2 standard deviations of the mean
+- **99.7%** of our samples will fall between +/- 3 standard deviations of the mean
+
+# 이항분포(Binomial Distribution)
+
+Binomial Distribution 은 이항분포로, 성공 확률과 시행 횟수를 바탕으로 특정 '성공' 횟수의 발생 가능성을 알려줍니다.
+
+Numpy 의 `np.random.binomial` 함수를 활용하면 binomial distribution 을 따르는 난수를 생성할 수 있습니다. 위 함수는 다음과 같은 파라미터를 취합니다.
+
+- **N**: 한 번의 실험에서의 시행 횟수
+- P: 성공 확률(또는 특정 사건이 발생할 확률)
+- **size**: 실험 횟수
+
+```python
+a = np.random.binomial(10, 0.30, size=10000)
+
+plt.hist(a, range=(0, 10), bins=10, normed=True)
+plt.xlabel('Number of "Free Throws"')
+plt.ylabel('Frequency')
+plt.show()
+```
+
+위 코드는 다음과 같은 이항분포를 생성합니다.
+
+<img src="https://s3.amazonaws.com/codecademy-content/courses/numpy/free_throws.svg" alt="" />
+
+# Review
+
+이번 포스팅에서 다룬 내용을 정리하면 다음과 같습니다.
+
+- What is a histogram and how to map one using Matplotlib
+- How to identify different dataset shapes, depending on **peaks** or distribution of data
+- The definition of a **normal distribution** and how to use NumPy to generate one using NumPy’s random number functions
+- The relationships between normal distributions and **standard deviations**
+- The definition of a **binomial distribution**
+
+# References
+
+- [Codecademy](http://www.codecademy.com)

@@ -1,0 +1,129 @@
+---
+title: KNN 알고리즘으로 Regression 하는 방법
+summary: KNN 알고리즘으로 regression 문제를 푸는 방법에 대해서 알아봅시다
+date: '2019-10-20T16:00:00.000Z'
+draft: false
+slug: 'how-to-regression-with-KNN'
+category: Machine Learning
+tags:
+  - TIL
+  - Machine Learning
+  - Python
+---
+
+KNN 알고리즘은 classification 문제를 푸는데 유용한 알고리즘이지만, 동시에 regression 문제도 풀 수 있습니다. 이번 포스팅에서는 저번 KNN 포스팅에서 사용했던 movie 데이터를 그대로 사용하도록 하겠습니다. 그러나 새로운 영화의 good 또는 bad 를 분류하는 것이 아닌, 실제 IMDb 평점을 예측해보도록 하겠습니다.
+
+그 과정은 classification 에서와 거의 동일하지만, 마지막 단게에서 이웃의 good, bad 수를 세는 것이 아닌 이웃의 IMDb 평점의 평균을 계산합니다. 예를 들어, 세 이웃의 평점이 `5.0`, `9.2`, `6.8` 이라면 새로운 영화의 평점은 `7.0` 으로 예측될 것입니다.
+
+# Weighted Regression
+
+평균을 그냥 계산할 수도 있지만, 좀더 우아한 방법으로 계산할 수 있습니다. 바로 이웃이 얼마나 가까운지에 따라서 _weighted_ average(가중 평균)을 계산하는 것입니다. 예를 들어 영화 X의 평점을 예측하고자 하는데 다음과 같은 세 이웃 영화가 있다고 생각해봅시다.
+
+| 영화 | 평점 | 영화 X 와의 거리 |
+| ---- | ---- | ---------------- |
+| A    | 5.0  | 3.2              |
+| B    | 6.8  | 11.5             |
+| C    | 9.0  | 1.1              |
+
+그냥 이웃 영화들의 평점 평균을 계산한다면 6.93이 될 것입니다. 그러나 영화 X는 영화 C와 가깝기 때문에, C의 평점이 평균을 계산할 때 더 중요하게 작용하면 좋을 것입니다. Weighted average로 평균을 계산한다면 다음과 같습니다.
+
+$$\cfrac{ {5.0\over3.2} + {6.8\over11.5} + {9.0\over1.1} }{ {1\over3.2} + {1\over11.5} + {1\over1.1} } = 7.9$$
+
+numerator(분자)는 각 영화의 평점, 즉 예측하고자 하는 값을 각각 X와의 거리로 나눈 값의 합입니다. denominator(분모)는 1을 각각 X와의 거리로 나눈 값의 합입니다. 평점은 전혀 변하지 않았지만, 새롭게 계산된 평균값은 7.9가 되었습니다.
+
+## Python code
+
+이전에는 이웃의 class에 따라 unknown 데이터의 class를 분류하는 `.classify()` 함수를 작성하였는데, 이번에는 평점을 예측하는 `.predict()` 함수를 작성해봅시다. 한 가지 차이점은 이전엔 라벨로 movie_labels라는 0과 1로 분류되는 데이터를 활용했다면 이번에는 movie_ratings 라는 평점(실수) 데이터를 활용합니다.
+
+```python
+from movies import movie_dataset, movie_ratings
+
+def predict(unknown, dataset, movie_ratings, k):
+  distances = []
+  # dataset의 모든 데이터를 순회합니다
+  for title in dataset:
+    movie = dataset[title]
+    # 각 데이터의 unknown과의 거리와 title을 distances 배열에 추가합니다
+    distances.append([distance(movie, unknown), title])
+  distances.sort()	# 거리가 가까운 순으로 정렬합니다
+
+  neighbors = distances[0:k]	# 가장 가까운 k 개의 이웃을 구합니다
+  numerator, denominator = [ 0, 0 ]
+
+  for neighbor in neighbors:
+    numerator += movie_ratings[neighbor[1]] / neighbor[0]
+    denominator += 1 / neighbor[0]
+
+  return numerator / denominator
+```
+
+# Scikit-Learn
+
+역시나 scikit-learn에서 위와 같이 regression 문제를 풀 수 있는 KNN 알고리즘을 제공합니다. `KneighborsRegressor` 객체를 활용하고, 사용 방법은 `KNeighborsClassifier` 과 동일합니다. 먼저 `sklearn` 에서 `neighbors` 를 불러와 `KneighborsRegressor` 를 임포트합니다.
+
+```python
+from sklearn.neighbors import KNeighborsRegressor
+```
+
+그런 다음 regressor 객체를 생성해줍시다. 이 때 `n_neighbors`(`k`) 를 지정하고, `weights` 옵션을 지정해줍니다. 만약 `weights` 옵션으로 `uniform` 을 지정해 주면 평균을 계산할 때 모든 이웃의 값이 동등하게 반영됩니다. 반면 `distance` 로 지정해주면 평균을 계산할 때 가중 평균으로 계산합니다.
+
+```python
+regressor = KNeighborsRegressor(n_neighbors = 3, weights = "distance")
+```
+
+다음으로 `.fit()` 함수를 호출하여 데이터를 학습시킵니다.
+
+```python
+training_points = [
+  [0.5, 0.2, 0.1],
+  [0.9, 0.7, 0.3],
+  [0.4, 0.5, 0.7]
+]
+
+training_labels = [5.0, 6.8, 9.0]
+regressor.fit(training_points, training_labels)
+```
+
+마지막으로 `.predict()` 함수에 unknown 데이터를 전달합니다.
+
+```python
+unknown_points = [
+  [0.2, 0.1, 0.7],
+  [0.4, 0.7, 0.6],
+  [0.5, 0.8, 0.1]
+]
+
+guesses = regressor.predict(unknown_points)
+```
+
+이제 우리의 영화 데이터를 활용해서 특정 영화의 평점을 예측해보도록 합시다. 이 때 `k` 는 5로 설정하고, 평균은 가중평균으로 계산하도록 합시다.
+
+```python
+from movies import movie_dataset, movie_ratings
+from sklearn.neighbors import KNeighborsRegressor
+
+regressor = KNeighborsRegressor(n_neighbors=5, weights='distance')
+
+regressor.fit(movie_dataset, movie_ratings)
+# 세 영화의 [정규화된 투입 예산, 러닝 타임, 제작 연도] 데이터를 예측해봅시다
+print(regressor.predict([
+    [0.016, 0.300, 1.022],	# Incredibles 2
+    [0.0004092981, 0.283, 1.0112], # The Big Sick
+    [0.00687649, 0.235, 1.0112]	# Greatest Showman
+]))
+# [6.84913968 5.47572913 6.91067999]
+```
+
+# Review
+
+이번 포스팅에서는 KNN 으로 regression 문제를 푸는 방법에 대해서 간단히 알아보았습니다. 이번 포스팅에서 배운 내용을 정리하면 다음과 같습니다.
+
+- The K-Nearest Neighbor algorithm can be used for regression. Rather than returning a classification, it returns a number.
+- By using a weighted average, data points that are extremely similar to the input point will have more of a say in the final result.
+- scikit-learn has an implementation of a K-Nearest Neighbor regressor named `KNeighborsRegressor`.
+
+다음 포스팅에서는 Logistic Regression 에 대해서 알아보도록 합시다🥰
+
+# References
+
+- [Codecademy](http://www.codecademy.com)

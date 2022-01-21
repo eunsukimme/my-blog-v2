@@ -1,0 +1,302 @@
+---
+title: How Redux Works with UI(React)
+summary: Redux가 UI(React)와 어떻게 연결되는지 알아봅시다
+date: '2021-10-11T20:00:00.000Z'
+draft: false
+slug: 'how-redux-works-with-UI'
+category: Frontend
+tags:
+  - Frontend
+  - State Management
+  - Redux
+  - React
+  - React-Redux
+socialImage: '/media/redux.png'
+---
+
+[지난 포스팅](https://blog.eunsukim.me/posts/how-redux-works)에서 Redux가 어떻게 동작하는지 살펴보았다. 이번 포스팅에서는 이전에 우리가 만든 Redux가 어떻게 React와 같은 UI 라이브러리와 함께 맞물려 돌아가는지 알아보자.
+
+이를 위해 먼저 특정 UI 라이브러리에 관계 없이 Redux가 UI와 연결되는 공통 원리에 대해 살펴본다. 그런 다음 React에 대한 공식 Redux binding 라이브러리인 [react-redux](https://react-redux.js.org/)의 기본 동작 원리를 소개하고, 그 내부가 어떻게 생겼는지 알아보도록 하자
+
+## Integrate Redux with UI
+
+공식 문서에 따르면 Redux는 [총 5단계의 과정](https://react-redux.js.org/introduction/why-use-react-redux#integrating-redux-with-a-ui)을 거쳐 UI와 연결된다. 간단히 설명하면 UI를 통해 action을 dispatch 하여 store가 수정되면 이를 subscribe 하는 콜백 함수를 호출하고, 이 콜백 함수에서 수정된 데이터를 바탕으로 UI를 업데이트(re-render) 시킨다.
+
+```js
+// 1) store 생성한다
+const store = Redux.createStore(counter)
+// 2) store의 update를 subscribe 하고, 콜백 함수로 render function을 전달한다
+store.subscribe(render)
+const valueEl = document.getElementById('value')
+// 3. subscription 콜백이 호출되면
+function render() {
+  // 3.1) 현재 store의 state를 읽고
+  const state = store.getState()
+  // 3.2) 필요한 데이터를 추출하여
+  const newValue = state.toString()
+  // 3.3) UI를 업데이트 한다
+  valueEl.innerHTML = newValue
+}
+// 4) UI를 initial state를 바탕으로 render 하고
+render()
+// 5) UI 인풋을 바탕으로 action을 dispatch 한다
+document.getElementById('increment').addEventListener('click', () => {
+  store.dispatch({ type: 'INCREMENT' })
+})
+```
+
+## React-Redux
+
+react-redux는 위 과정을 다음과 같은 과정으로 구현하고 있다. 먼저 root 컴포넌트에서 store를 주입함으로써 모든 child 컴포넌트에서 store에 접근할 수 있도록 한다.
+
+```jsx
+import { Provider } from 'react-redux'
+const store = createStore(myReducer)
+ReactDOM.render(
+  <Provider store={store}>
+    <App />
+  </Provider>,
+  document.getElementById('root')
+)
+```
+
+### Consuming Store: Connect()
+
+그리고 react-redux의 `connect()` 함수를 사용하여 React 컴포넌트가 Redux store에 접근할 수 있도록 한다.
+
+```jsx
+const AddTodo = ({ todos }) => {
+  // TODO implementation...
+}
+const mapStateToProps = (state) => {
+  return {
+    todos: state.todos,
+  }
+}
+const mapDispatchToProps = (dispatch) => {
+  return {
+    onTodoClick: (id) => {
+      dispatch(toggleTodo(id))
+    },
+  }
+}
+export default AddTodo = connect(mapStateToProps, mapDispatchToProps)(AddTodo)
+```
+
+`connect()` 함수는 store로 부터 데이터를 가져와서 연결된 컴포넌트의 props 로 전달해준다. 만약 store에 저장된 데이터가 변경되면 연결된 컴포넌트의 props도 변경되고 자동으로 re-render가 이뤄진다.
+
+### Consuming Store: Hooks
+
+`connect()` 함수를 사용하지 않고 React Hooks로 store에 접근할 수도 있다.
+
+```jsx
+import { useSelector, useDispatch } from 'react-redux'
+
+export function Counter() {
+  const count = useSelector((state) => state.counter.value)
+  const dispatch = useDispatch()
+  const increment = () => dispatch({ type: 'increment' })
+  const decrement = () => dispatch({ type: 'decrement' })
+
+  return (
+    <div>
+      <span>Count: {count}</span>
+      <button onClick={increment}> + </button>
+      <button onClick={decrement}> - </button>
+    </div>
+  )
+}
+```
+
+`useSelector` 훅을 통해서 store로 부터 값을 가져온다. 그리고 `useDispatch` 훅으로 action을 dispatch 하는 함수를 가져올 수 있다. `useSelector` 로 가져온 값이 변경되면 해당 컴포넌트는 자동으로 re-render가 이뤄진다.
+
+## Code our own React-Redux
+
+자, 위에서 react-redux가 어떻게 사용되는지 살펴보았다. 이제 그 내부가 어떻게 동작하는지 살펴보자.
+
+### Provider
+
+먼저 모든 컴포넌트에서 store에 접근할 수 있도록 store를 컴포넌트 트리에 주입하는 Provider가 필요하다. 이는 React Context를 활용함으로써 가능하다.
+
+```jsx
+export const ReactReduxContext = React.createContext(null)
+
+function Provider({ store, children }) {
+  return <ReactReduxContext.Provider value={store}>{children}</ReactReduxContext.Provider>
+}
+
+export default Provider
+```
+
+### connect()
+
+다음으로 먼저 `connect()` 함수로 store의 데이터를 컴포넌트에 전달하는 방법을 살펴보자. `connect()` 함수는 예시에서 볼 수 있듯이 컴포넌트를 반환하는 함수를 반환하는 함수이다.
+
+```js
+function connect(mapStateToProps, mapDispatchToProps) {
+  return function (WrappedComponent) {
+    // ...
+  }
+}
+```
+
+`connect()` 함수의 역할은 store의 state와 action을 dispatch하는 함수들을 컴포넌트의 props로 전달하는 것이다. 이를 위해 wrapper 컴포넌트에선 `ReactReduxContext` 에 접근하여 store를 `mapStateToProps`, `mapDispatchToProps` 함수에 전달하고, 이를 통해 반환된 데이터를 wrapped 컴포넌트의 props 로 전달해주어야 한다.
+
+```jsx
+import ReactReduxContext from './Context'
+
+export default function connect(mapStateToProps, mapDispatchToProps) {
+  return function (WrappedComponent) {
+    return class extends React.Component {
+      static contextType = ReactReduxContext
+      render() {
+        return (
+          <WrappedComponent
+            {...this.props}
+            {...mapStateToProps(this.context.getState(), this.props)}
+            {...mapDispatchToProps(this.context.dispatch, this.props)}
+          />
+        )
+      }
+    }
+  }
+}
+```
+
+이렇게 하면 wrapped 컴포넌트에서 store의 데이터에 접근할 수 있을 뿐만 아니라 action을 dispatch 하는 함수도 호출할 수 있다. 이제 우리에게 필요한 건 store의 데이터가 수정되었을 때 UI가 re-render 되도록 하는 것이다.
+
+```jsx
+export default function connect(mapStateToProps, mapDispatchToProps) {
+  return function (WrappedComponent) {
+    return class extends React.Component {
+      render() {
+        /** ...생략 **/
+      }
+
+      componentDidMount() {
+        // store가 update되면 wrapper 컴포넌트를 forceUpdate 하여 re-render 시킨다
+        this.unsubscribe = this.context.subscribe(this.handleChange.bind(this))
+      }
+      componentWillUnmount() {
+        // wrapper 컴포넌트가 unmount 되면 unsubscribe 한다
+        this.unsubscribe()
+      }
+      handleChange() {
+        this.forceUpdate()
+      }
+    }
+  }
+}
+```
+
+이렇게 해서 동작하는 react-redux를 직접 구현했다. 이를 바탕으로 간단한 카운터 컴포넌트를 작성하여 동작을 확인할 수 있다.
+
+```jsx
+import connect from '../../react-redux/connect'
+
+function Counter({ count, increment, decrement }) {
+  return (
+    <div>
+      <h2>Count: {count}</h2>
+      <button onClick={increment}> + </button>
+      <button onClick={decrement}> - </button>
+    </div>
+  )
+}
+const mapStateToProps = (state, props) => ({
+  count: state.value,
+  ...props,
+})
+const mapDispatchToProps = (dispatch, props) => ({
+  increment: () => dispatch({ type: 'increment' }),
+  decrement: () => dispatch({ type: 'decrement' }),
+  ...props,
+})
+export default connect(mapStateToProps, mapDispatchToProps)(Counter)
+```
+
+### Hooks
+
+`connect()` 뿐만 아니라 Hooks를 통해서 store에 접근할 수 있다. 먼저 store의 데이터를 가져오는 `useSelector` 를 작성하자.
+
+```js
+import { useContext, useEffect, useReducer } from 'react'
+import ReactReduxContext from './Context'
+
+const useSelector = (selectorFn) => {
+  const [_, forceRender] = useReducer((s) => s + 1, 0)
+  const store = useContext(ReactReduxContext)
+
+  useEffect(() => {
+    const unsubscribe = store.subscribe(forceRender)
+    return () => {
+      unsubscribe()
+    }
+  }, [store])
+
+  return selectorFn(store.getState())
+}
+
+export default useSelector
+```
+
+`useSelector` 는 store를 파라미터로 받아 데이터를 반환하는 `selectorFn` 를 파라미터로 받는다. 이 함수에 현재 store의 state를 전달한 값을 반환하기만 하면 된다. 이때 store의 state가 변경되면 `forceRender` 를 실행해 re-render 시켜준다.
+
+```js
+import { useContext } from 'react'
+import ReactReduxContext from './Context'
+
+const useDispatch = () => {
+  const store = useContext(ReactReduxContext)
+  return store.dispatch
+}
+
+export default useDispatch
+```
+
+`useDispatch` 는 더 간단하다. store의 dispatch 를 반환하기만 하면된다.
+
+이렇게 해서 Hooks로도 데이터를 가져올 수 있도록 하였다. 이제 Hooks를 활용한 카운터 컴포넌트를 작성해보고 동작하는지 확인해보자.
+
+```jsx
+import useSelector from '../../react-redux/useSelector'
+import useDispatch from '../../react-redux/useDispatch'
+
+function Counter() {
+  const count = useSelector((state) => state.value)
+  const dispatch = useDispatch()
+  const increment = () => dispatch({ type: 'increment' })
+  const decrement = () => dispatch({ type: 'decrement' })
+
+  return (
+    <div>
+      <h2>Count: {count}</h2>
+      <button onClick={increment}> + </button>
+      <button onClick={decrement}> - </button>
+    </div>
+  )
+}
+```
+
+<div>
+  <iframe
+    src="https://codesandbox.io/embed/ui-binding-connect-oqv0g?fontsize=14&hidenavigation=1&module=%2Fsrc%2Fcomponents%2FCounter%2Findex.js&theme=dark"
+    style={{ width: '100%', height: '500px', border: 0, borderRadius: '4px', overflow: 'hidden' }}
+    title="ui-binding"
+    allow="accelerometer; ambient-light-sensor; camera; encrypted-media; geolocation; gyroscope; hid; microphone; midi; payment; usb; vr; xr-spatial-tracking"
+    sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
+  ></iframe>
+</div>
+
+## Recap
+
+이번 포스팅에서는 Redux가 어떻게 UI에 바인딩되는지 살펴보았다. 먼저 기본적인 원리를 소개하고 React 공식 바인딩 라이브러리인 react-redux 의 동작 방식에 대해서 살펴보았다. 이 포스팅에서 작성한 코드는 [Github 레포지토리](https://github.com/eunsukimme/build-your-own-redux/tree/ui-binding)에서 확인할 수 있다. 여기서 작성한 코드도 마찬가지로 production ready하지 않다는 사실에 주의하자. 실제로 react-redux는 많은 performance optimization 코드를 포함하고 있지만 이를 소개하기에는 이 포스팅의 범위를 벗어나므로 여기서는 다루지 않았다. 여기서는 교육적인 내용을 목적으로 하여 implementation details을 상세히 설명하기보다 간략한 concept를 소개했다. 더 알아보고 싶다면 react-redux Github 레포지토리를 둘러보자. [useSelector 코드](https://github.com/reduxjs/react-redux/blob/7.x/src/hooks/useSelector.js)만 봐도 엄청난 optimization 코드가 포함되어 있다는 것을 금세 알 수 있다.
+
+## References
+
+- https://blog.jakoblind.no/learn-react-redux-by-coding-the-connect-function-yourself/
+- [connect function gist](https://gist.github.com/gaearon/1d19088790e70ac32ea636c025ba424e)
+- https://github.com/reduxjs/react-redux
+- https://react-redux.js.org/tutorials/connect
+- https://reactjs.org/docs/context.html
+- https://blog.eunsukim.me/posts/how-redux-works

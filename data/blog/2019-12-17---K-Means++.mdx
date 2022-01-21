@@ -1,0 +1,95 @@
+---
+title: K-Means++ 개념 정리
+summary: 'K-Means 알고리즘은 제일 처음 k개의 centroids를 선택하기 위해 임의의 데이터 포인트를 지정하였습니다. 그러나 이렇게 랜덤하게 k개의 centroids를 선택하게 되면 optimal cluster가 아닌 suboptimal cluster를 구성하게 될 수 있습니다. 이러한 문제를 해결하는 K-Means++ 알고리즘에 대해서 알아봅시다.'
+date: '2019-12-17T23:30:00.000Z'
+draft: false
+slug: 'understanding-K-Means++'
+category: Machine Learning
+tags:
+  - TIL
+  - Machine Learning
+  - Python
+  - scikit-learn
+socialImage: '/media/k-means++.png'
+---
+
+K-Means 클러스터링은 반 세기의 역사를 지닌 전통있는 알고리즘이지만, 오늘날에도 여전히 사용되며 인기있는 기계학습 모델 중 한 가지 입니다. [이전 포스팅(K-Means Clustering 개념 정리)](https://eunsukimme.github.io/ml/2019/12/16/K-Means/)에서 K-Means 알고리즘을 구현할 때 제일 처음 `k` 개의 centroids를 선택하기 위해 임의의 데이터 포인트를 지정하였습니다. 그러나 여기에는 한 가지 문제가 존재합니다. 이렇게 랜덤하게 `k` 개의 centroids를 선택하게 되면 optimal cluster가 아닌 suboptimal cluster를 구성하게 될 수 있습니다.
+
+이번 포스팅에서는 K-Means의 또 다른 버전인 **K-Means++ 알고리즘**에 대해서 알아보도록 하겠습니다. K-Means++ 알고리즘은 제일 처음 centroids를 선택하는 방법에 변화를 줌으로써 위에서 언급한 문제를 해결할 수 있습니다.
+
+# Poor Clustering
+
+K-Means++ 알고리즘을 설명하기에 앞서 처음에 centroids를 선택할 때 임의로 선택하게되면 어떤 문제가 발생하게 되는지 알아봅시다. 다음과 같이 가로가 세로보다 더 긴 `4` 개의 데이터 포인트가 사각형 모양으로 위치하고 있다고 생각해봅시다.
+
+<img
+  width="400"
+  src="https://s3.amazonaws.com/codecademy-content/programs/machine-learning/k-means-plus-plus/no_clusers.png"
+/>
+
+만약 클러스터링 하고자 하는 그룹의 수가 `2` 라면(`k=2`), 어떤 데이터끼리 묶어야 할까요? 수직 거리보다 수평 거리가 더 길기 때문에 왼쪽과 오른쪽으로 나누어 묶을 수 있을 것입니다. 즉, 왼쪽에 한 그룹(보라색)과 오른쪽에 한 그룹(노란색)으로 나뉘게 됩니다.
+
+<img
+  width="400"
+  src="https://s3.amazonaws.com/codecademy-content/programs/machine-learning/k-means-plus-plus/correct.png"
+/>
+
+이번엔 K-Means 클러스터링 알고리즘을 사용한다고 가정해봅시다. 제일 처음 centroids의 위치를 임의로 선택합니다. 그런데 운이 나쁘게도 centroids가 사각형의 위, 아래 변의 정 중앙에 위치하게 되었습니다.
+
+<img
+  width="400"
+  src="https://s3.amazonaws.com/codecademy-content/programs/machine-learning/k-means-plus-plus/poor_cluster.png"
+/>
+
+이렇게 되면 데이터는 위쪽(노란색), 아래쪽(보라색) 그룹으로 나눠지게 되고 알고리즘이 즉시 converge하게 됩니다.
+
+<img
+  width="400"
+  src="https://s3.amazonaws.com/codecademy-content/programs/machine-learning/k-means-plus-plus/final_cluster.png"
+/>
+
+이렇게 될 경우 데이터가 왼쪽, 오른쪽 그룹으로 나뉘어져야 함에도 불구하고 위쪽, 아래쪽 그룹으로 나뉘어지면서 _suboptimal clustering_ 이 만들어지게 됩니다. K-Means 클러스터링 알고리즘에는 이러한 문제가 발생할 수 있습니다.
+
+# K-Means++
+
+K-Means++ 알고리즘은 기존의 K-Means 알고리즘에서 `k` 개의 centroids를 초기화하는 STEP 1을 다음과 같이 변경합니다.
+
+1. 첫 번째 centroid를 임의로 지정합니다.
+2. 남은 각 데이터 포인트에 대해서 가장 가까운 centroids와의 거리를 계산합니다.
+3. 다음 centroid는 각 데이터 포인트와 가장 가까운 centroid와의 거리에 비례하는 확률에 따라 지정됩니다. 이로 인해 다음 centroid가 이미 지정된 centroid에 근접하게 되는 것을 예방할 수 있습니다.
+4. 2 ~ 3 단계를 `k` 개의 centroids를 모두 지정할 때 까지 반복합니다.
+
+아래 그림은 K-Mean와 K-Means++ 알고리즘으로 클러스터링한 결과를 비교한 것입니다. K-Means++을 사용했을 때 centroids가 더 퍼져있는 것을 알 수 있습니다.
+
+<img
+  width="420"
+  alt="Screen Shot 2019-12-17 at 11 19 52 PM"
+  src="https://user-images.githubusercontent.com/31213226/71003045-cc193f00-2123-11ea-8bdf-617ba58db655.png"
+/>
+
+<img
+  width="420"
+  alt="Screen Shot 2019-12-17 at 11 20 00 PM"
+  src="https://user-images.githubusercontent.com/31213226/71003090-df2c0f00-2123-11ea-9503-8f14648cb8d2.png"
+/>
+
+# Scikit-Learn
+
+Scikit-learn 라이브러리에서 K-Means++ 알고리즘을 구현하는것은 매우 간단합니다. `KMeans` 모델을 생성할 때 `init` 옵션을 `k-means++` 로 설정하면 됩니다.
+
+```python
+model = KMeans(n_clusters=k, init='k-means++')
+```
+
+사실 `KMeasn` 모델을 생성할 때 `init` 옵션은 디폴트로 `k-means++` 가 주어집니다. 만약 랜덤하게 centroids를 지정하고자 한다면 `init` 옵션을 `random` 으로 설정하면 됩니다.
+
+```python
+model = KMeans(n_clusters=k, init='random')
+```
+
+# Review
+
+K-Means++ 알고리즘은 centroids를 초기화할 때 전략적으로 접근함으로써 K-Means를 개선시킨 알고리즘입니다. 결과적으로 optimal cluster를 구성할 가능성을 더 높여줍니다. 또한 성능 측면에서도 개선되는데, centroids를 임의로 지정할 때 운이 나쁘다면 converge하기까지 오랜 시간이 걸릴 수 있습니다. 하지만 K-Means++는 일반적으로 빠른 속도로 convergence에 도달합니다.
+
+# References
+
+- [Codecademy](http://codecademy.com)

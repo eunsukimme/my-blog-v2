@@ -1,0 +1,183 @@
+---
+title: Serverless 둘러보기
+summary: 'Serverless의 정의에 대해 알아보고 AWS를 활용하여 간단한 어플리케이션을 만들어봅시다'
+date: '2020-01-26T21:30:00.000Z'
+draft: false
+slug: 'serverless-at-a-glance'
+category: Backend
+tags:
+  - Backend
+  - serverless
+  - AWS
+  - Node.js
+socialImage: '/media/serverless.png'
+---
+
+서버리스(Serverless)란 말을 처음 들으면 '서버가 존재하지 않는 아키텍처'를 연상시킵니다. 하지만 실제로 서버리스가 서버가 존재하지 않는 것을 의미하는 것은 아니며, 특정 작업을 AWS 나 MS Azure 또는 Google Cloud Platform 과 같은 클라우드 서비스에 의존하여 처리한다는 것을 의미합니다. 즉, 서버리스는 클라우드 서비스에서 제공하는 서버에 의존함으로써 개발자가 서버의 '존재'를 신경쓰지 않아도 되는 구조를 말합니다.
+
+서버리스는 대표적으로 BaaS(Backend as a Service)와 FaaS(Function as a Service)등이 있는데, BaaS 는 데이터베이스, SNS 연동 등의 기능들을 API 로 제공함으로써 서버 개발의 편의를 더해주는 Firebase 와 같은 서비스를 말합니다. 반면 FaaS 는 서버에서 돌아가는 로직을 여러 함수로 분할한 뒤 분산된 컴퓨팅 환경을 이용해 처리해주는 서비스를 말합니다.
+
+지금 당장은 아직 감이 잡히지 않으실 수 있습니다.이번 포스팅에서 다룰 내용은 FaaS 인데요, 이러한 서비스를 제공하는 대표 클라우드 서비스(AWS, MS, Google) 중에서도 AWS 의 Lambda 를 활용하여 serverless 어플리케이션을 개발하는 과정을 살펴보면서 서버리스에 이해해보는 시간을 가져보도록 하겠습니다.
+
+# 준비사항
+
+본격적인 개발에 앞서 먼저 [Node.js](https://nodejs.org/en/download/)(v6.x 이상) 를 설치해야 합니다. 또한 IAM 사용자 키를 발급받아 로컬 머신에 [AWS Credentials](https://serverless.com/framework/docs/providers/aws/guide/credentials/) 를 설정해 주어야 합니다. 지금부터는 Node.js 가 설치되고 AWS Credentials 가 설정되어있다고 가정하고 진행하도록 하겠습니다.
+
+## Serverless CLI 설치하기
+
+터미널에 다음 명령을 실행해줍니다.
+
+```sh
+npm install -g serverless
+```
+
+위 명령을 실행한 뒤 `serverless -v` 명령을 실행하였을 때 버전 정보가 잘 출력된다면 설치가 정상적으로 된 것입니다.
+
+# Serverless 어플리케이션 개발하기
+
+설치가 간단하죠? 이제 본격적으로 serverless 어플리케이션을 만들어 보도록 합시다.
+
+## 프로젝트 생성
+
+먼저 다음 명령을 실행해줍니다.
+
+```sh
+# 새로운 serverless 프로젝트를 생성합니다
+> serverless
+
+# 만들어진 프로젝트 디렉터리로 이동합니다
+> cd your-service-name
+```
+
+`serverless` 명령은 Node.js 또는 Python 프로젝트를 생성하며 `~/.aws/credentials` 에 명시된 내용을 바탕으로 serverless 프레임워크와 호환될 AWS 계정을 설정합니다. 또한 서버리스 어플리케이션을 모니터링하고 테스트할 수 있는 대시보드를 생성합니다.
+
+프로젝트 생성 중에 여러 설정 옵션들이 제공되는데, serverless 에 로그인하는 절차를 거칠 수도 있습니다. 일단 프로젝트를 생성하고 나면 프로젝트 폴더에는 `serverless.yml` 와 `handler.js`라는 두 파일이 만들어집니다. `serverless.yml`은 다음과 같이 구성되어 있습니다.
+
+```yml
+service: your-service-name
+app: your-service-name
+org: yourname
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+
+functions:
+  hello:
+    handler: handler.hello
+```
+
+그리고 `handler.js`는 다음과 같이 작성되어 있습니다. hello 라는 하나의 함수가 export 되어 있습니다.
+
+```javascript
+'use strict'
+
+module.exports.hello = async (event) => {
+  return {
+    statusCode: 200,
+    body: JSON.stringify(
+      {
+        message: 'Go Serverless v1.0! Your function executed successfully!',
+        input: event,
+      },
+      null,
+      2
+    ),
+  }
+}
+```
+
+## 프로젝트 배포
+
+`serverless deploy` 명령을 통해 서버리스 프로젝트를 배포할 수 있습니다. 아직 아무것도 건든 것은 없지만 배포해보도록 합시다. 배포를 할 때 S3 버킷을 만들게 되는데, 처음 배포한다면 버킷 생성으로 인해 시간이 조금 더 걸릴 수 있습니다.
+
+```sh
+> serverless deploy
+Serverless: Packaging service...
+...(생략)
+Serverless: Stack update finished...
+Service Information
+service: serverless-tutorial
+stage: dev
+region: us-east-1
+stack: serverless-tutorial-dev
+resources: 8
+api keys:
+  None
+endpoints:
+  None
+functions:
+  hello: serverless-tutorial-dev-hello
+layers:
+  None
+```
+
+배포가 성공적으로 끝났다면 위와 같은 내용이 콘솔에 출력되게 됩니다.
+
+## 프로젝트 테스트
+
+`handle.js` 에서 `hello` 함수가 export 된 것을 기억하시나요? `serverless.yml`에서 해당 함수를 연결짓는 로직이 존재하였으므로 이를 다음과 같이 로컬 머신에서 호출할 수 있습니다.
+
+```sh
+> serverless invoke local --function hello
+{
+    "statusCode": 200,
+    "body": "{\n  \"message\": \"Go Serverless v1.0! Your function executed successfully!\",\n  \"input\": {}\n}"
+}
+```
+
+## Endoint 생성
+
+`serverless.yml` 에 다음과 같이 event 를 추가함으로서 API Gateway 를 달아줄 수도 있습니다. 여기서 events 서버리스 함수의 트리거입니다.
+
+```yml
+functions:
+  hello:
+    handler: handler.hello
+    # 아래 코드를 추가해줍니다
+    events:
+      - http:
+          path: hello
+          method: post
+```
+
+이제 다시 배포해보면 해당 함수가 API Gateway 와 연결되어 endpoint 가 생성되게 됩니다. 이 endpoint 로 요청을 보내면 해당 함수가 호출됩니다.
+
+```sh
+> serverless deploy
+...(생략)
+Serverless: Stack update finished...
+Service Information
+service: serverless-tutorial
+stage: dev
+region: us-east-1
+stack: serverless-tutorial-dev
+resources: 18
+api keys:
+  None
+endpoints:
+  GET - https://zf4si6e67l.execute-api.us-east-1.amazonaws.com/dev/hello
+functions:
+  hello: serverless-tutorial-dev-hello
+layers:
+  None
+```
+
+<figure>
+  <img
+    style={{ width: '100%', objectFit: 'contain' }}
+    alt="Endpoint로 요청을 보낸 결과"
+    src="/media/serverless/capture.png"
+  />
+  <figcaption style={{ color: 'grey' }}>Endpoint로 요청을 보낸 결과</figcaption>
+</figure>
+
+# Review
+
+이번 포스팅에서는 serverless 프레임워크와 AWS 를 활용하여 간단한 서버리스 어플리케이션을 만드는 과정을 살펴보았습니다. `serverless.yml`의 function 에 특정 기능을 수행하는 함수를 정의하고 이를 Javascript 함수와 연결시킵니다. 또 events 에 HTTP 프로토콜을 활용하여 path 와 method 를 명세함으로써 API Gateway 에 연결된 endopint 를 추가할 수 있었습니다. 다음 포스팅에서는 Express 와 MongoDB 를 활용하여 간단한 서버리스 CRUD 어플리케이션을 만들어보도록 하겠습니다.
+
+# References
+
+- [서버리스 아키텍쳐란?](https://velopert.com/3543)
+- [Serverless 프레임워크로 서버리스 애플리케이션 생성 및 배포하기](https://velopert.com/3549)
+- [Serverless docs](https://serverless.com/framework/docs/providers/aws/guide/quick-start/)

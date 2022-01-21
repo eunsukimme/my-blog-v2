@@ -1,0 +1,119 @@
+---
+title: 웹 좌표 시스템을 이해하며 특정 Element로 스크롤 하는 방법
+summary: Javascript를 활용하여 특정 Element로 스크롤 하는 방법과 웹 좌표 시스템에 대해 알아봅시다
+date: '2020-12-05T02:00:00.000Z'
+draft: false
+slug: 'how-to-scroll-to-an-element'
+category: Frontend
+tags:
+  - Frontend
+  - web
+  - javascript
+socialImage: '/media/javascript.jpeg'
+---
+
+이번 포스팅에서는 네비게이션 메뉴를 클릭하면 해당 메뉴와 관련된 element 로 스크롤 하는 기능을 구현하기 위한 방법을 알아보자. 이 기능을 구현하기 전에 먼저 웹에서의 좌표 시스템을 이해하는 것은 `element`, `window` 등 웹 인터페이스에서 제공하는 수 많은 프로퍼티나 메서드들의 이름만 보고도 무슨 역할을 하는지 이해하는데에 분명 큰 도움이 된다.
+
+## 웹의 좌표 시스템(Coordinate systems)
+
+특정 element로 스크롤 하기 위해선 element의 위치를 알아야 하고, 해당 element 의 위치를 알기 위해선 고정된 원점(origin)으로부터 얼마만큼 떨어져 있는지를 알아야 한다. 이러한 맥락은 수학에서 사용하는 좌표계와 동일하다. 웹에서는 CSSOM(CSS object model)에 의해 사용되는 좌표 시스템이 있는데, 원점에서 x축을 기준으로 오른쪽으로 갈 수록, y축을 기준으로 아래쪽으로 갈 수록 그리고 z축을 기준으로 화면 바깥으로 튀어나올수록 양의 값을 가지며 원점은 기본적으로 좌상단 꼭지점(top-left corner)이다.
+
+이러한 웹의 좌표 시스템을 바라보는 데에는 다음과 같은 4가지 관점이 존재한다.
+
+### Offset
+
+Offset(오프셋)을 사용하는 좌표 시스템은 특정 element 또는 event 가 발생한 곳의 좌상단을 기준삼는다.
+
+예를 들어, mouse event 가 발생했을 때 해당 이벤트에 정의된 마우스의 위치(`offsetX`, `offsetY`)는 이벤트가 발생한 노드의 좌상단 꼭지점이 된다.
+
+### Client
+
+Client(클라이언트)를 사용하는 좌표 시스템은 **현재 viewport 또는 이벤트가 발생한 browsing context의 좌상단 꼭지점을 원점으로 삼는다.** 즉, 전체 document 중 화면에 나타나는 부분의 좌상단 꼭지점이 원점이 되며 스크롤 여부에 관계없이 항상(0, 0)이 된다.
+
+예를 들어, `MouseEvent.clientX` 와 `MouseEvent.clientY` 속성은 현재 viewport의 좌상단 꼭지점을 기준으로 mouse event 가 발생한 시점의 마우스의 위치를 나타낸다.
+
+### Page
+
+Page(페이지)를 사용하는 좌표 시스템은 **document의 좌상단 꼭지점을 원점으로 삼는다.** 즉, document 내의 element 는 위치를 이동시키지 않는 이상 같은 좌표값을 유지한다.
+
+예를 들어, `MouseEvent.pageX` 와 `MouseEvent.pageY` 는 현재 document 의 좌상단 꼭지점을 기준으로 mouse event 가 발생한 시점의 마우스의 위치를 나타낸다.
+
+### Screen
+
+마지막으로 Screen(스크린)을 사용하는 좌표 시스템은 **사용자의 모니터 스크린 좌상단 꼭지점을 원점으로 삼는다.** 즉, 윈도우 창을 움직이면 document 내 좌표 값도 이동한다.
+
+예를 들어, `MouseEvent.screenX` 와 `MouseEvent.screenY` 는 현재 사용자 모니터의 좌상단 꼭지점을 기준으로 mouse event 가 발생한 시점의 마우스 위치를 나타낸다.
+
+<figure>
+  <img src="https://s1.o7planning.com/en/12293/images/36612997.png" width="540" />
+  <figcaption style={{ color: 'grey' }}>웹 좌표 시스템</figcaption>
+</figure>
+
+## 특정 element로 스크롤 하려면
+
+웹의 좌표 시스템을 간단히 살펴 보았으니, 이제 본격적으로 특정 element 로 스크롤 하는 기능을 구현하기 위한 방법을 알아보자.
+
+### Element.scrollIntoView()
+
+가장 간단하게는 `Element` 내장 메서드인 `scrollIntoView()` 를 호출하는 방법이 있다. 이 방법으로 특정 element 가 화면에 나타날 때 까지 스크롤 할 수 있고, viewport 의 top/bottom 에 위치할 때 까지 스크롤 하도록 지정할 수 있다.
+
+그러나 위 방법은 스크롤 위치를 정교하게 조정할 수 없다. 즉, 내가 원하는 위치로 몇 px 를 더하거나 뺀 만큼 스크롤 할 수 없다. 나의 경우 특정 element 로 스크롤 하면서 동시에 어느 정도 추가적으로 스크롤이 되는 것을 programmatic하게 조정할 필요가 있어서 다른 방법을 선택했다.
+
+### Window.scrollTo()
+
+`window` 내장 메서드 중 `window.scrollTo()` 메서드를 활용하면 document의 원점을 기준으로 특정 값 만큼 스크롤 할 수 있다. 우리가 알아야 할 것은 얼마만큼 스크롤 할 것인지, 즉 스크롤 하고자 하는 element 가 document의 원점에서 y축을 기준으로 얼마나 떨어져 있는지 계산하는 것이다.
+
+아쉽게도 단번에 element가 document 원점에서 얼마나 떨어져 있는지 계산하는 API는 존재하지 않는다. 그러나 이를 아주 간단히 계산할 수 있는 방법이 있다. 바로 element 가 viewport 의 원점을 기준으로 얼마나 떨어져 있는지를 구하고, viewport 가 document 원점을 기준으로 얼마나 떨어져 있는지를 구하여 두 값을 더하면 element 가 document 원점을 기준으로 얼마나 떨어져 있는지를 알 수 있다.
+
+자, 위 값들을 순서대로 구해보도록 하자.
+
+## Viewport와 element사이의 거리
+
+먼저, element가 viewport로 부터 얼마나 떨어져 있는지는 `Element.getBoundingClientRect()` 메서드를 호출하여 알 수 있다.
+
+### Element.getBoundingClientRect()
+
+이 메서드는 `DOMRect` 라는 객체를 반환하는데, 이 객체는 해당 element 의 사이즈와 viewport 에 대하여 상대적인 위치 정보를 포함한다. 이 때 측정되는 사이즈에는 패딩과 border-width 가 포함된다. 아래 그림은 `DOMRect` 를 도식적으로 표현한 그림이다.
+
+<figure>
+  <img src="https://mdn.mozillademos.org/files/17155/element-box-diagram.png" width="540" />
+  <figcaption style={{ color: 'grey' }}>DOMRect</figcaption>
+</figure>
+
+즉, `getBoundingClientRect().top` 은 viewport의 원점에서 y축을 기준으로 element사이의 거리를 나타낸다. 이제 우리는 document 와 viewport 사이의 거리만 구하면 된다.
+
+## Document와 viewport 사이의 거리
+
+Document와 viewport사이의 거리는 Y축을 기준으로 스크롤 된 정도와 같은 의미이다. 왜냐하면 기본적으로 document의 origin과 viewport의 origin은 동일하기 때문에 viewport 가 움직인 만큼, 즉 스크롤한 만큼이 document와의 거리를 나타낸다. 스크롤 된 정도는 `window.scrollY` 속성으로 얻을 수 있다.
+
+### Window.scrollY
+
+`window.scrollY` 는 document에서 수직으로 얼마나 스크롤 하였는지를 픽셀 단위로 반환한다. 참고로 `window.scrollY` 는 `window.pageYOffset` 과 동일한데, `pageYOffset` 이 구 버전 브라우저와 호환이 가능하기 때문에 IE 9버전을 지원해야 한다면 `window.scrollY` 대신 `window.pageYOffset` 을 사용해야 한다.
+
+## 하나의 함수로 해결
+
+이렇게 해서 우리는 document와 element 사이의 거리를 계산할 수 있게 되었다. 아래는 이 거리를 계산하는 함수를 만들고 `window.scrollTo` 를 호출하여 해당 element 로 스크롤하는 것을 구현한 코드이다.
+
+```jsx
+// document 와 element 사이의 거리를 구한다
+const getElementY = (element) => {
+  return window.pageYOffset + element.getBoundingClientRect().top
+}
+
+// 해당 element 로 스크롤!
+window.scrollTo(0, getElementY(document.getElementById('some-div')))
+```
+
+## Conclusion
+
+특정 element 로 스크롤 하기 위해 먼저 웹의 좌표 시스템을 간단히 훑어보고 스크롤 기능을 구현하기 위해 어떻게 접근해야 하는지에 대해 살펴보았다. `element.scrollIntoView()` 메서드를 활용하면 간단히 구현할 수 있는 반면 미세 조정이 어렵고, `window.scrollTo()` 메서드를 활용하면 document 와 element 간의 거리를 계산하여 파라미터로 전달해주어야 한다.
+
+document와 element사이의 거리는 document & viewport사이의 거리와 viewport & element사이의 거리를 합한 값이다. document와 viewport사이의 거리(스크롤한 정도)는 `window.scrollY` 또는 `window.pageYOffset` 으로 구할 수 있으며 브라우저 호환성을 고려한다면 `window.pageYOffset` 을 사용해야 하고, viewport와 element사이의 거리는 `element.getBoundingClientRect().top` 으로 구할 수 있다.
+
+## References
+
+- [Coordinate systems](https://developer.mozilla.org/en-US/docs/Web/CSS/CSSOM_View/Coordinate_systems)
+- [Window.scrollY](https://developer.mozilla.org/en-US/docs/Web/API/Window/scrollY)
+- [Element.getBoundingClientRect()](https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect)
+- [CSSOM 이란 무엇인가](https://ibtg.github.io/frontend/2020/09/14/jscssom/)
+- [CSSOM](https://varvy.com/performance/cssom.html)

@@ -1,0 +1,157 @@
+---
+title: 리눅스(Linux) 개요
+summary: 가장 인기있는 오픈소스 운영체제인 리눅스(Linux)에 대해서 알아봅시다
+date: '2019-09-21T00:00:00.000Z'
+draft: false
+slug: 'understanding-linux'
+category: Linux
+tags:
+  - Linux
+  - Ubuntu
+  - OS
+---
+
+리눅스, 컴퓨터 공학을 전공하지 않았다면 조금은 어색한 이 이름은 90 년대에 개발되었지만 오늘날에도 가장 활발히 사용되고 있는 컴퓨터 운영체제입니다.
+
+리눅스는 핀란드 헬싱키의 대학원생 리누스 토르발스(Linus Benedict Torvalds)가 처음으로 개발하였는데, 처음에는 운영 체제가 아닌 운영 체제 위에서 실행되는 터미널 에뮬레이터에 불과했습니다. 그러나 점차 파일 제어, 시리얼 통신 등 여러 기능을 지원하면서 운영 체제 커널로 발전하기 시작했고, 1991 년 9 월 17 일 처음으로 운영 체제 기능을 하는 리눅스가 인터넷을 통해 공개되었습니다. 이후 지금까지 전 세계 수천만의 개발자들이 리눅스 개발에 자체적으로 참여하고 있으며, 많은 기업과 단체의 후원이 이루어지고 있고, 리누스 토르발스의 지휘 하에 리눅스 커널 개발이 여전히 진행되고 있습니다.
+
+<figure style={{ textAlign: 'center' }}>
+  <img
+    width="300"
+    src="https://k.kakaocdn.net/dn/bG5Ucd/btquDK8txpf/bBn1AUE9KIID5KohR9pJhK/img.png"
+    alt="tux"
+  />
+  <figcaption style={{ color: 'grey' }}>리눅스 마스코트 Tux</figcaption>
+</figure>
+
+리눅스의 인기에 힘입어 리눅스 기반의 여러 오픈소스 운영 체제들이 등장하기 시작했습니다. Fedora, Ubuntu 등의 획기적인 운영체제가 나타나기 시작했고, 구글에서 배포하는 모바일 운영체제인 안드로이드도 리눅스 기반으로 만들어지게 되었습니다. 현재는 약 200 여 종류가 넘는 다양한 배포판들이 존재하고 있으며, 요구되는 환경에 따라 적절한 배포판을 사용할 수 있습니다. 오늘날 여러 기업들에서도 리눅스를 적극 활용하고 있는 모습을 보이고 있습니다. 카카오뱅크는 2017 년에 대한민국 금융권 최초로 전산 시스템에 리눅스를 도입하였고([관련 기사](http://www.ddaily.co.kr/news/article.html?no=160101)), 국민은행은 2020 년도의 차세대 전산 시스템으로 메인프레임과 함께 리눅스를 도입하기로 결정하였습니다([관련 기사](http://www.etnews.com/20180523000346)).
+
+오늘날에도 여전히 사랑받으며 다양한 분야에서 활용되고 있는 리눅스를 사용하는 방법을 이 시리즈를 통해서 알아보고자 합니다. 이번 포스팅에서는 리눅스의 구성요소와 더불어 현존하는 배포판들을 알아보고, 리눅스 환경에서 간단한 명령어를 사용해보며 리눅스를 들여다 보도록 합시다.
+
+# 리눅스 구성요소
+
+리눅스는 다음과 같이 크게 3 가지 기능을 하는 요소들로 구성됩니다.
+
+- Shared libraries - 컴파일 타임(static library) 또는 런 타임(dynamic library)에 응용 프로그램과 링크(link)되는 오브젝트 코드들
+
+- Application Programs - 파일 조작, 텍스트 에디터, 웹 브라우저, 오디오 및 비디오, 프로그래밍, 워드 프로세서, 암호화 등 여러 기능을 하는 수 많은 프로그램 들
+
+- Shell & GUI - 명령어 방식의 사용자 인터페이스 및 KDE, GNOME 과 같은 GUI
+
+비전공자라면 생소한 단어가 보일 수 있는데, 컴파일 타임은 프로그래밍 언어를 컴퓨터가 이해할 수 있게 0 과 1 로 구성된 기계어로 변환하는 시간을 말하고, 런 타임은 컴파일 된 코드가 실행되는 동안의 시간을 말합니다.
+
+# 리눅스 배포판
+
+리눅스 배포판은 약 200 여 가지가 존재합니다. 크게 보면 Debian 계열과 Red Hat 계열이 지배적입니다. 서버로 사용할때는 보통 Red Hat Enterprise, Debian, OpenSUSE 등이 주로 사용되고 일반 데스크톱에서는 Ubuntu, Debian, Fedora, Linux Mint 등이 주로 사용됩니다. 대표적인 리눅스 배포판을 표로 나타낸 그림은 다음과 같습니다.
+
+<figure style={{ textAlign: 'center' }}>
+  <img
+    width="600"
+    src="https://k.kakaocdn.net/dn/d698hx/btquCKn2209/qWucDcax1jKjFicdYjSzq1/img.png"
+    alt=" 대표적인 리눅스 배포판들(출처: Unix and Linux System Administration Handbook, 5th Edition)"
+  />
+  <figcaption style={{ color: 'grey' }}>
+    대표적인 리눅스 배포판들(출처: Unix and Linux System Administration Handbook, 5th Edition)
+  </figcaption>
+</figure>
+
+리눅스의 모든 배포판은 [여기](http://static.lwn.net/Distributions/)에서 확인할 수 있습니다. 여담으로 국내에서 개발되어 배포된 리눅스도 존재하는데, 여러가지가 있었지만 현재는 거의 개발이 중단된 상태고 [안녕리눅스](https://annyung.oops.org/) 만이 오늘날 개발되고 있는 국산(?) 리눅스입니다. 최근에는 TmaxOS 라는 배포판도 등장하였습니다.
+
+# 리눅스 접근제어
+
+리눅스는 다중 사용자(mulit-user)를 지원합니다. 각 사용자는 유일한 username 을 가지며, 고유의 디렉터리(home)를 소유할 수 있습니다. 이 중 superuser 라고 불리는 특권을 가진 root 라는 사용자가 존재하는데, superuser 라는 말은 스마트폰 루팅에 관심이 있는 분들이라면 한 번쯤은 들어봤을 것입니다. superuser 는 시스템의 거의 모든 자원에 대한 권한을 가지는 사용자를 말합니다. 반면 일반 사용자는 자신의 home 디렉터리에 대해서만 완전한 권한을 가집니다. 소프트웨어 패키지의 설치/삭제, 시스템 설정, 네트워크 설정 등은 superuser 권한이 있을 때에만 가능합니다.
+
+root 계정으로 접속해서 리눅스 명령어를 연습하는 것은 초보자에게 있어 매우 위험합니다. 잘 알지 못하는 시스템 파일을 실수로 건드릴 수도 있고 명령어를 잘못 입력해서(i.e. `rm -rf .`) 원치 않는 결과를 낳을 수도 있습니다. 그러므로 일반 사용자 계정으로 로그인한 상태로 리눅스 명령어를 실행하는 것이 안전하다. 우리가 다음 섹션에서 실습할 때에도 일반 사용자 계정으로 로그인해서 실습하도록 할 것입니다.
+
+# 리눅스 실습 - 버전 확인
+
+자, 이제 리눅스 환경에서 기본적인 정보들을 확인하는 명령을 실습해봅시다. 필자는 Window10 운영체제에서 VMware Workstation 15 Player 를 설치하여 Ubuntu 18.04 LTS 를 사용한 가상 환경을 구축하였습니다. 필자와 동일한 환경을 구축했다면, 가상 환경에 접속해서 다음과 같은 화면을 볼 수 있습니다.
+
+<figure style={{ textAlign: 'center' }}>
+  <img
+    width="600"
+    src="https://k.kakaocdn.net/dn/FV9Tj/btquDMk69z5/X2tykZVy8eyAqiqQlPXNtK/img.png"
+    alt=""
+  />
+  <figcaption style={{ color: 'grey' }}>Ubuntu 가상환경의 바탕화면</figcaption>
+</figure>
+
+지금 보이는 화면이 우분투 운영체제의 기본 바탕화면입니다. 왼쪽에 보이는 메뉴에서 터미널 아이콘을 클릭해서 터미널 창을 열면 다음 같은 검은 인터페이스 창이 나타납니다.
+
+<figure style={{ textAlign: 'center' }}>
+  <img src="https://k.kakaocdn.net/dn/oGQab/btquDXUg6AN/AulvC966MaNKKpBxaMKWBk/img.png" alt="" />
+  <figcaption style={{ color: 'grey' }}>터미널 화면</figcaption>
+</figure>
+
+prompt 의 형태는 `<user_id>@ubuntu:<현재 디렉터리>$`입니다. 여기서 현재 디렉터리는 물결 표시(`~`)인데, 이는 home 디렉터리를 표시하는 기호입니다. root 계정에서는 `$`대신 `#`이 표시되는데, 이 프롬프트의 형태는 나중에 변경할 수 있습니다. 다음 명령을 실행하여 나타나는 출력 결과를 확인해봅시다.
+
+```
+$ uname -a
+```
+
+<figure style={{ textAlign: 'center' }}>
+  <img src="https://k.kakaocdn.net/dn/bh9bU7/btquCiMzovw/lufBSTnto6vcTK6nicAjv0/img.png" alt="" />
+  <figcaption style={{ color: 'grey' }}>uname -a 명령 출력 결과</figcaption>
+</figure>
+
+출력 결과는 순서대로 커널 이름(`Linux`), 노드 이름(`ubuntu`), 커널 릴리즈(`4.18.0-16-generic`), 커널 버전(`#17~18.04.1-Ubuntu SMP Tue Feb 12 13:35:51 UTC 201`9), 하드웨어 머신(`x86_64`), 프로세서 타입(`x86_64`), 하드웨어 플랫폼(`x86_64`), 현재 운영체제(`GNU/Linux`)입니다. `uname`은 현재 시스템의 정보를 알려주는 명령어입니다. 이번에는 다음 명령을 실행하여 나타나는 출력 결과를 확인해봅시다.
+
+```
+$ cat /etc/os-release
+```
+
+<figure style={{ textAlign: 'center' }}>
+  <img src="https://k.kakaocdn.net/dn/yLacZ/btquEPnUBp4/fl4XVnKRRWF2ynUq9sVBw1/img.png" alt="" />
+  <figcaption style={{ color: 'grey' }}>cat /etc/os-release 명령 결과</figcaption>
+</figure>
+
+`cat`명령은 파일로부터 데이터를 읽어서 터미널에 출력하는 명령어입니다. 출력 결과는 현재 운영체제에 대한 정보를 나타냅니다.  앞서 말했던 것처럼 `Ubuntu 18.04.2 LTS` 버전이 현재 운영체제인 것을 확인할 수 있습니다. 다음 명령을 실행하여 출력 결과를 확인해봅시다.
+
+```
+$ cat /proc/version
+```
+
+<figure style={{ textAlign: 'center' }}>
+  <img src="https://k.kakaocdn.net/dn/GKrBb/btquDLmdM5x/XwakmrS85hjyJJiCvzpqNK/img.png" alt="" />
+  <figcaption style={{ color: 'grey' }}>cat /proc/version 명령 결과</figcaption>
+</figure>
+
+`uname -a` 명령에서 보았던 것과 비슷합니다. 이 명령으로도 커널과 배포판의 버전을 확인할 수 있습니다.
+
+# 리눅스 실습 - superuser 권한
+
+리눅스에서 superuser 권한을 획득할 수 있는 방법은 다음과 같이 3 가지가 있습니다.
+
+1. `root` 로그인 - 처음부터 root 로 로그인하는 방법입니다. 낮은 보안성으로 인해 추천하지 않으며, Ubuntu 의 경우에는 default 로 disable 되어 있습니다.
+
+2. `su` 명령 사용 - su(switch user) 명령으로 root 계정으로 전환하는 방법입니다. `su` 명령을 입력하면 root 의 password 를 물어보고, `su` 명령으로 root 가 아닌 다른 사용자로도 전환이 가능합니다.
+
+3. `sudo` 명령 사용 - 일반적으로 권장되는 방법으로, root 계정으로 전환하지 않고 일반 사용자가 `sudo` 명령으로 privileged 명령을 수행하는 방법입니다. 각 사용자에 대해서 `sudo` 명령을 사용할 권한이 사전에 주어져야 합니다.
+
+현재 가상 환경 운영체제는 우분투인데, 우분투에서는 기본적으로 root 계정이 비활성화되어 있습니다. 그러므로 여기서는 `sudo`를 활용하여 관리자 권한으로 명령을 실행하는 것을 실습해보도록 합시ㄷ. 다음 명령을 실행해봅시다.
+
+```
+$ adduser
+```
+
+<figure style={{ textAlign: 'center' }}>
+  <img src="https://k.kakaocdn.net/dn/sTuzu/btquEQHaJD8/gwvevSizKx3KohDYV0ZGYk/img.png" alt="" />
+  <figcaption style={{ color: 'grey' }}>adduser 명령 결과</figcaption>
+</figure>
+
+`adduser` 명령은 현재 운영체제에 사용자를 추가하는 명령입니다. 여기서는 "Only root may add a user..." 라면서 root 만이 사용자나 그룹을 추가할 수 있다는 메시지를 전달하고 있습니다. 이번엔 `sudo` 명령을 추가해서 다음과 같이 실행해봅시다.
+
+```
+$ sudo adduser
+```
+
+<figure style={{ textAlign: 'center' }}>
+  <img src="https://k.kakaocdn.net/dn/mrzh0/btquEP2Aev8/RiTA2PfLBLGmG57sfWMIiK/img.png" alt="" />
+  <figcaption style={{ color: 'grey' }}>sudo adduser 명령 결과</figcaption>
+</figure>
+
+위 명령을 실행하면 `sudo` 명령을 실행할 권한이 있는지 확인하기 위해 비밀번호를 요구합니다. 비밀번호를 입력하고 나면 "Only one or two names allowed"라는 메시지가 나타나는데, 이는 파라미터로 추가할 사용자의 이름을 입력하라는 뜻으로, root 권한으로 사용자를 추가할 준비가 되었다는 의미를 내포합니다.
+
+# Review
+
+이번 포스팅에서는 리눅스의 개념, 역사 그리고 간단한 명령어 사용법에 대해서 짧게 살펴보았습니다. 다음 포스팅에서는 리눅스의 기본적인 명령어들을 실습해보도록 합시다.

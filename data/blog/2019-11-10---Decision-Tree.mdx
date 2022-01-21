@@ -1,0 +1,222 @@
+---
+title: Decision Tree(의사 결정 트리) 개념 정리
+summary: classification 문제를 해결하는 Decision Tree에 대해서 알아봅시다
+date: '2019-11-10T23:55:00.000Z'
+draft: false
+slug: 'understanding-decision-tree'
+category: Machine Learning
+tags:
+  - TIL
+  - Machine Learning
+  - Python
+  - scikit-learn
+socialImage: '/media/decision_tree.jpg'
+---
+
+Decision Tree(의사 결정 트리)는 데이터의 feature에서 패턴을 찾는 머신러닝 모델입니다. 의사 결정 트리는 지도학습 모델로, 주어진 labeled 데이터로 트리를 만듦으로써 '학습'을 진행하게 됩니다.
+
+이해를 돕기 위해 다음과 같은 의사 결정 트리가 있다고 생각해 봅시다.
+
+<img src="https://s3.amazonaws.com/codecademy-content/programs/data-science-path/decision-trees/tree_gif.gif" />
+
+위 GIF는 잠든 시간, 공부한 시간, 기존 평균 등급 등의 feature를 활용해 다음 시험에서 A를 받을 수 있을지를 예측하는 의사 결정 트리가 만들어지는 과정을 나타내고 있습니다. 위 그림에서 빨간 동그라미는 A를 받지 못한 학생을 나타내고 연두색 동그라미는 A를 받은 학생을 나타냅니다.
+
+의사 결정 트리는 제일 처음 모든 데이터를 특정 feature를 바탕으로 작은 그룹들로 나누게 됩니다. 위 그림에서는 기존 평균 등급별로 전체 데이터를 작은 그룹들로 나누고 있습니다. 기존에 평균 등급이 A인 그룹, B인 그룹, C인 그룹 등등으로 나누어지게 되는 것입니다. 그렇게 작은 그룹들로 나눈 다음, 다시 각 그룹들을 특정 feature를 바탕으로 작은 그룹들로 나누는 일을 반복합니다.
+
+결국엔 더 이상 작은 그룹들로 나눌 수 없는 지점(노드)에 도달하게 되는데, 이러한 노드를 leaf(리프)노드라고 부릅니다. 예측 단계에서 Unlabeled 데이터를 의사결정트리에 통과시키고 리프노드에 도달하면, 해당 노드에서 제일 많이 포함된 label이 Unlabeled 데이터의 label로 지정됩니다.
+
+의사 결정 트리의 전반적인 내용을 살펴보았는데, 그러면 데이터를 어떻게 분할해야 잘 분할했다고 말할 수 있을까요?
+
+# Gini Impurity(지니 불순도)
+
+다음과 같은 두 가지 트리가 있다고 생각해봅시다. 어떤 트리가 다음 시험에서 A를 받을 학생 데이터를 잘 분류하는 모델일까요?
+
+<img src="https://s3.amazonaws.com/codecademy-content/programs/data-science-path/decision-trees/comparison_1.svg" />
+
+<img src="https://s3.amazonaws.com/codecademy-content/programs/data-science-path/decision-trees/comparison_2.svg" />
+
+첫 번째 트리를 사용한다고 생각해봅시다. 우리는 결국 라벨이 여러가지가 섞여있는 leaf노드를 갖게 됩니다. 하지만 만약 두 번째 트리를 사용하게 된다면 정확히 하나의 그룹에 하나의 label만 존재하는 데이터를 포함하는 leaf노드를 갖게 됩니다. 두 번째 트리를 사용할 때 분류기가 더 confident하다고 말할 수 있게 됩니다.
+
+이처럼 각 그룹에 속한 데이터의 _Gini Impurity_(지니 불순도)를 계산함으로써 의사 결정 트리의 분할 기준을 정량화 할 수 있습니다. 각 그룹의 Gini Impurity를 계산하기 위해선 `1` 에서 각 그룹에 속한 데이터의 각 label이 차지하는 비율의 제곱을 빼면 됩니다. 예를 들어, 학생들이 속한 그룹을 분리하였더니 특정 그룹에 3 명의 학생이 `A` 를 받았고 1명의 학생이 `B` 를 받았다면, 해당 그룹의 Gini Impurity는 다음과 같이 계산할 수 있습니다.
+
+$$1 - ( { {3}\over{4} } )^2 - ( { {1}\over{4} } )^2 = 0.375$$
+
+만약 특정 그룹에 오직 한 종류의 label만 존재한다면, 해당 그룹의 Gini Impurity는 `0` 이 됩니다. 데이터 분할 이후의 각 그룹의 Impurity가 낮으면 낮을 수록, 즉 불순도가 낮으면 낮을 수록 데이터가 속한 그룹이 더 pure하다고 말할 수 있고, 결과적으로 데이터가 잘 분류되었다고 말할 수 있습니다.
+
+# Information Gain(정보 이득)
+
+데이터를 작은 그룹으로 나누었을 때 해당 그룹에서의 Gini Impurity가 낮아야 좋다는 걸 알게 되었습니다. 그런데 한 가지 더 알아야 할 것이 있습니다. 어떤 feature를 기준으로 데이터를 나누어야 하는 것일까요?
+
+이는 특정 feature로 데이터를 분할하였을 때 _information gain_(정보 이득)을 계산함으로써 정할 수 있습니다. Information gain은 데이터를 분할하기 전의 impurity와 분할 후의 impurity의 차를 계산함으로써 얻을 수 있습니다. 예를 들어, Impurity가 `0.5` 인 데이터가 있다고 생각해봅시다. 이를 분할하여서 세 개의 그룹으로 나누었고, 각 그룹의 impurity가 `0`, `0.375`, `0` 이었다고 할 때 information gain은 $0.5 - 0 - 0.375 - 0 = 0.125$로 계산됩니다.
+
+<img src="https://s3.amazonaws.com/codecademy-content/programs/data-science-path/decision-trees/info.svg" />
+
+이렇게 information gain을 계산함으로써 우리는 분할 후 데이터가 어떻게 구성되는지에 대한 정보를 알 수 있게 되었습니다. 분할 후의 각 그룹의 impurity합이 분할 전 보다 낮기 때문에 더 purer해졌다고 말할 수 있습니다. 분할 시 information gain이 높을 수록 좋습니다. 만약 information gain이 `0` 이라면, 이는 분할 전과 분할 후의 impurity가 동일하단 것을 뜻하기 때문에 해당 분할은 의미가 없는 것이나 마찬가지 입니다.
+
+위 경우 information gain이 음수로 나타날 수 있는데, 이러한 문제를 해결하기 위해서 _weighted_ information gain을 계산합니다.
+
+## Weighted Information Gain
+
+분할 전과 분할 후의 impurity를 비교하는 것 만으로는 좋은 분할 기준을 선정하는 것에 대한 충분한 정보를 얻지 못 합니다. 분할 후 각 그룹에 속하는 데이터 수도 이러한 성능을 측정하는데 중요한 정보가 될 수 있기 때문입니다. 예를 들어, 아래 그림은 동일한 impurity를 가진 두 그룹을 나타내고 있습니다. 어느 그룹이 더 좋은 분류기에서 만들어진 결과라고 말할 수 있을 까요?
+
+<img src="https://s3.amazonaws.com/codecademy-content/programs/data-science-path/decision-trees/impurity-0.svg" />
+
+두 그룹 모두 완벽히 pure하지만, 오른쪽 그룹이 더 의미가 있습니다. 왜냐하면 많은 데이터가 포함됨으로써 분류 결과가 우연에 의해 만들어진 것이 아니라고 confident할 수 있는 정도가 왼쪽 그룹보다 더 높기 때문입니다. 반대로도 생각해 봅시다. 아래 그림은 동일하게 완전히 impure한 두 그룹을 나타내고 있습니다.
+
+<img src="https://s3.amazonaws.com/codecademy-content/programs/data-science-path/decision-trees/impurity-5.svg" />
+
+impurity는 해당 그룹의 데이터 수가 많을수록 더 의미있다고 위에서 설명하였습니다. 오른쪽 그룹에서 두 class를 완벽하게 분리하기 위해서는 몇 번의 분할 작업이 더 수반되야 할 것이라고 예상할 수 있습니다. 그 동안 왼 쪽의 그룹은 별로 중요하게 여겨지지 않는데, 단 한 번의 분할로 pure한 그룹을 만들 수 있기 때문입니다. 즉, 더 중요하게 다뤄지는 그룹은 바로 오른쪽 그룹입니다.
+
+자, 그러면 분할 후 그룹에 포함된 데이터의 수도 information gain을 계산하는데 반영될 수 있도록 계산 공식을 조금 수정해봅시다. 단순히 분할 전의 impurity에 분할 후의 impurity를 빼는 것 대신에 분할 후의 _weighted_ impurity를 빼도록 합시다. 만약 분할 전의 데이터의 수가 `20` 이였고, 분할 후 한 그룹의 데이터 수가 `2` 였다면, 해당 그룹의 weighted impurity는 ${ 2\over20 } * impurity$가 될 것입니다. 즉, 데이터 수가 낮은 그룹의 impurity가 information gain을 계산할 때 미치는 중요도를 낮추는 것입니다.
+
+<img src="https://s3.amazonaws.com/codecademy-content/programs/data-science-path/decision-trees/weighted_info.svg" />
+
+이제 모든 feature에 대해서 각 feature를 기준으로 분할 후의 weighted information gain을 계산하고, 가장 information gain이 높게 계산됬을 때의 feature로 데이터를 분할하면 됩니다.
+
+# Recursive Tree Building
+
+이제 데이터를 분할하는 기준을 선정하는 방법을 알게 되었으니, tree를 완성할 때 까지 이를 반복하면 됩니다. 이는 재귀 함수로 구현할 수 있습니다. 먼저 모든 training 데이터에 대해서 출발하여 분할하기 가장 좋은 feature를 찾은 뒤, 해당 feature를 기준으로 데이터를 분할하고 이러한 과정을 분할 후의 각 그룹에 대해서 반복하면 됩니다.
+
+만약 분할함으로써 information gain을 얻을 수 있는 feature가 존재하지 않는다면, 그때 recursion을 빠져나오면 됩니다. 즉, 더이상 purer한 subset을 만들 수 없을 때 해당 그룹은 leaf노드가 되고 재귀 함수는 return을 호출하면 됩니다.
+
+## Python code
+
+먼저 특정 데이터셋이 주어졌을 때 해당 데이터셋의 Gini Impurity를 계산하고 이를 반환하는 함수 `gini()` 를 작성합시다. 이 함수는 파라미터로 배열을 받습니다.
+
+```python
+def gini(dataset):
+  impurity = 1
+  # 데이터셋에 포함된 class의 수를 class 이름: class 수 와 같은 key:value 쌍으로 저장합니다
+  label_counts = Counter(dataset)
+  # 각 class 들이 차지하는 비율의 제곱값을 impurity에서 뺴 나갑니다
+  for label in label_counts:
+    prob_of_label = label_counts[label] / len(dataset)
+    impurity -= prob_of_label ** 2
+  return impurity
+```
+
+그런 다음, 특정 데이터셋의 분할 전과 분할 후의 information gain을 계산하고 이를 반환하는 `information_gain()` 함수를 작성합니다. 이 함수는 파라미터로 분할 전의 그룹이 포함하는 class와 분할 후의 그룹들을 받습니다.
+
+```python
+def information_gain(starting_labels, split_labels):
+  # information_gain을 분할 전 그룹의 gini impurity로 초기화 합니다
+  info_gain = gini(starting_labels)
+  # 분할 된 각 그룹에서의 gini impurity와 분할 전 그룹과의 데이터 수 비율을 곱한 값을 빼 나갑니다
+  for subset in split_labels:
+    info_gain -= gini(subset) * len(subset)/len(starting_labels)
+  return info_gain
+```
+
+자, 이제 특정 feature를 기준으로 데이터셋을 분할하고 분할된 데이터 그룹과 각 그룹이 포함하는 class를 반환하는 `split()` 함수를 작성합시다. 이 함수는 파라미터로 데이터셋과 labels, 그리고 기준으로 사용할 feature(column)을 받습니다.
+
+```python
+def split(dataset, labels, column):
+    data_subsets = []	# 분할 후의 데이터 그룹을 저장하는 배열
+    label_subsets = []	# 분할 후의 class(label) 그룹을 저장하는 배열
+    # 주어진 기준 column의 unique한 값들을 저장한다
+    counts = list(set([data[column] for data in dataset]))
+    counts.sort()
+    for k in counts:
+        new_data_subset = []	# 특정 값(k)을 기준으로 분할 된 그룹에 속한 데이터를 저장하는 배열
+        new_label_subset = []	# 특정 값(k)을 기준으로 분할 된 그룹에 포함되는 class를 저장하는 배열
+        for i in range(len(dataset)):
+          	# 주어진 데이터의 특정 column의 값이 k라면 해당 데이터를 k번째 그룹에 담는다
+            if dataset[i][column] == k:
+                new_data_subset.append(dataset[i])
+                new_label_subset.append(labels[i])
+        data_subsets.append(new_data_subset)	# k 그룹을 분할 후 그룹을 저장하는 배열에 추가한다
+        label_subsets.append(new_label_subset)
+    return data_subsets, label_subsets
+```
+
+다음으로 `split()` 함수에 전달할 최적의 feature를 찾는 `find_best_split()` 함수를 작성합니다. 이 함수는 데이터셋과 labels를 파라미터로 받습니다.
+
+```python
+def find_best_split(dataset, labels):
+    best_gain = 0	# 데이터를 특정 feature로 분할하였을 때 가장 높게 측정된 information_gain
+    best_feature = 0	# 데이터를 분할 할 feature의 index
+    for feature in range(len(dataset[0])):
+        data_subsets, label_subsets = split(dataset, labels, feature)
+        gain = information_gain(labels, label_subsets)
+        if gain > best_gain:
+            best_gain, best_feature = gain, feature
+    return best_feature, best_gain
+```
+
+마지막으로 위 함수들을 활용하여 recursive 하게 트리를 만드는 `build_tree()` 함수를 작성합니다. 이 함수는 파라미터로 데이터셋과 labels를 받습니다.
+
+```python
+def build_tree(data, labels):
+  # 데이터를 분할 할 최적의 feature를 찾습니다
+  best_feature, best_gain = find_best_split(data, labels)
+  # 만약 분할 후의 information_gain이 0이라면 해당 노드는 더 분할 할 필요가 없으므로 빠져나옵니다
+  if best_gain == 0:
+    return Counter(labels)
+  # 데이터를 찾은 feature로 분할합니다
+  data_subsets, label_subsets = split(data, labels, best_feature)
+
+  branches = []
+  # 분할 후 각 그룹에 대해서 build_tree 함수를 재귀적으로 호출합니다
+  for i in range(len(data_subsets)):
+    branches.append(build_tree(data_subsets[i], label_subsets[i]))
+
+  return branches
+```
+
+이로써 주어진 training 데이터로 의사 결정 트리를 만드는 함수를 모두 구현하였습니다! Unlabeled 데이터를 predict하기 위해선 해당 데이터를 트리에 전달한 뒤, leaf노드에 도달하였을 때 해당 노드의 가장 많은 비율을 차지하는 label이 바로 Unlabeled 데이터의 label이 됩니다.
+
+# Scikit-Learn
+
+Python라이브러리인 `scikit-learn` 의 `tree` 모듈은 의사 결정 트리를 만들 수 있는 `DecisionTreeClassifier` 라는 클래스를 제공합니다. `DecisionTreeClassifier` 을 생성하기 위해선 다음과 같이 호출합니다.
+
+```python
+classifier = DecisionTreeClassifier()
+```
+
+그런 다음, 다른 모델들과 마찬가지로 `.fit()` 함수를 호출하여 트리를 만들 수 있습니다.
+
+```python
+classifier.fit(training_data, training_labels)
+```
+
+다음으로 `.predict()` 함수를 호출하여 test 데이터의 class를 예측할 수 있습니다.
+
+```python
+predictions = classifier.predict(test_data)
+```
+
+마지막으로, 트리의 성능을 평가하기 위해 `.score()` 함수를 호출합니다. `.score()` 함수는 test 데이터 중 올바르게 분류한 데이터의 비율을 반환합니다.
+
+```python
+print(classifier.score(test_data, test_labels))
+```
+
+# Decision Tree Limitations
+
+사실 지금까지 구현한 의사 결정 트리는 greedy한 알고리즘으로, 항상 _globably optimal_ 하진 않습니다. 무슨 말이냐면, 데이터를 분할할 때 information gain이 가장 높은 feature로 분할하는데 이러한 행위가 항상 가장 좋은 트리를 형성한다는 것은 아니란 말입니다. 즉, 당장 분할할 때의 information gain이 조금 낮은 feature로 분할하더라도 그렇게 분할하였을 때 나중에 가서 더 좋은 결과가 나올 수도 있다는 말입니다.
+
+아쉽게도 globally optimal한 트리를 만드는 것은 매우 어려운 작업입니다. 하지만 이렇게 greedy한 접근방식으로 트리를 만드는 것도 합리적인 접근 방식으로, 많은 경우에 좋은 트리를 형성합니다.
+
+의사 결정 트리의 또 다른 문제는 데이터에 *overfit*하기 쉽다는 것입니다. 일반적으로 트리의 높이가 높아질수록 training 데이터에 overfit 하기 쉬워집니다. 트리가 커질수록 trainig 데이터 위주로 데이터를 분할하게 되는 것입니다. 이러한 문제를 해결하는 한 가지 방법은 트리를 _prune_ 하는 것 입니다. 그리하여 트리의 사이즈를 작게 만드는 것입니다.
+
+아쉽게도 `scikit-learn` 에서는 따로 prune하는 메서드를 제공하고 있진 않습니다. 하지만, 트리를 생성할 때 간단한 옵션을 부여함으로써 트리의 크기를 제한할 수 있는 방법이 있습니다.
+
+`scikit-learn` 에서 `DecisionTreeClassifier` 를 생성할 때 `max_depth` 옵션을 부여할 수 있습니다. 이는 트리의 최대 높이를 지정하는 옵션으로, 해당 옵션의 값을 조절함으로써 트리가 엄청나게 거대해지는 것을 예방할 수 있습니다.
+
+```python
+classifier = DecisionTreeClassifier(max_depth = 11, random_state = 0)
+print(classifier.tree_.max_depth)	# 11
+```
+
+# Review
+
+지금까지 Decision Tree에 대해서 알아보았습니다. 이번 포스팅에서 배운 내용을 정리하면 다음과 같습니다.
+
+- Good decision trees have pure leaves. A leaf is pure if all of the data points in that class have the same label.
+- Decision trees are created using a greedy algorithm that prioritizes finding the feature that results in the largest information gain when splitting the data using that feature.
+- Creating an optimal decision tree is difficult. The greedy algorithm doesn’t always find the globally optimal tree.
+- Decision trees often suffer from overfitting. Making the tree small by pruning helps to generalize the tree so it is more accurate on data in the real world.
+
+# References
+
+- [Codecademy](http://www.codecademy.com)

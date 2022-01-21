@@ -1,0 +1,217 @@
+---
+title: Django REST Framework 튜토리얼
+summary: DRF(Django REST Framework)를 활용하여 CRUD 연산을 수행하는 API 를 만들어 봅시다.
+date: '2020-10-25T23:55:00.000Z'
+draft: false
+slug: 'django-rest-framework-tutorial'
+category: Backend
+tags:
+  - Backend
+  - Django
+  - DRF
+socialImage: '/media/django.png'
+---
+
+## 왜 Django REST Framework 를 사용할까?
+
+Django REST Framework 를 사용함으로써 얻는 가장 큰 이득은 쉽게 serialization 을 할 수 있다는 것입니다.
+
+Serialization 이란 쿼리셋과 모델 인스턴스 같은 복잡한 데이터를 JSON, XML 과 같은 네이티브 파이썬 데이터 타입으로 변환하는 것을 말합니다.
+
+장고에서는 모델을 정의하고 데이터를 조작하는 일을 내부적으로 ORM 을 활용함으로써 매우 쉽게 달성할 수 있는데, 이러한 특징으로 인해 Django REST Framework 가 데이터베이스 모델을 REST-ful 포맷으로 serialize 할 수 있습니다.
+
+Django REST Framework 를 활용하는 워크플로우는 다음과 같습니다.
+
+1. 장고 프로젝트 셋업
+2. 장고 ORM 이 매니징 할 모델 생성
+3. 장고 REST Framework 셋업
+4. 2 에서 생성한 모델을 Serialize
+5. URI 엔드포인트 생성하여 serialized 된 데이터 제공
+
+위 순서대로 프로젝트를 세팅하도록 하겠습니다.
+
+![https://miro.medium.com/max/2000/1*lAMsvtB6afHwTQYCNM1xvw.png](https://miro.medium.com/max/2000/1*lAMsvtB6afHwTQYCNM1xvw.png)
+
+React 를 프론트엔드로 사용하는 전형적인 장고 어플리케이션.
+
+## 1. 장고 프로젝트 세팅
+
+다음 명령을 실행하여 장고 프로젝트를 셋업해줍시다.
+
+```python
+django-admin startproject mysite
+```
+
+그리고 생성한 디렉터리로 이동한 뒤 API로 사용되어질 앱을 생성해줍시다.
+
+```python
+cd mysite
+python manage.py startapp myapi
+```
+
+그러면 앱 폴더가 생성되는데, 해당 앱을 사용하기 위해 `mysite/settings.py` 의 `INSTALLED_APS` 에 추가해줍시다.
+
+```python
+INSTALLED_APPS = [
+	'myapi.apps.MyapiConfig',
+	... # 생략
+]
+```
+
+그리고 장고 빌트인 모델들을 테이블로 만들기 위해 migrate 를 해줍시다.
+
+```python
+python manage.py migrate
+```
+
+또 어드민을 활용하기 위해 슈퍼유저를 생성하고 계정은 `admin`, 비밀번호는 `adminadmin` 으로 설정해줍시다.
+
+```python
+python manage.py createsuperuser
+```
+
+## 2. 모델 만들기
+
+다음으로, 우리가 API 로 제공할 모델을 생성하도록 합시다. `myapi/models.py` 를 열고 다음과 같이 `Person` 이라는 모델을 생성해주세요.
+
+```python
+from django.db import models
+
+# Create your models here.
+class Person(models.Model):
+    name = models.CharField(max_length=60)
+    alias = models.CharField(max_length=60)
+
+    def __str__(self):
+        return self.name
+```
+
+여기서 Person 이라는 모델은 `name`, `alias` 두 character 필드를 갖고 최대 길이를 `60` 자로 제한하였습니다. 또 `__str__` 메서드를 정의했는데, 이는 인스턴스를 콘솔에 출력할 때 이름이 출력될 수 있도록 한 것입니다.
+
+이렇게 모델을 생성하고 난 뒤, 장고가 이를 데이터베이스에 반영할 수 있도록 하기 위해서 먼저 변경사항을 커밋하는 `makemigration` 을 실행해야 합니다.
+
+```python
+python manage.py makemigrations
+```
+
+그런 다음 이를 데이터베이스에 바로 반영해줍시다.
+
+```python
+python manage.py migrate
+```
+
+또 모델을 어드민 사이트에서 접근하고 생성/수정/삭제할 수 있도록 하려면 어드민에 해당 모델을 등록해주어야 합니다. `myapi/admin.py` 를 다음과 같이 작성해줍시다.
+
+```python
+from django.contrib import admin
+from myapi.models import Person
+
+# Register your models here.
+admin.site.register(Person)
+```
+
+그리고 서버를 실행한 뒤 admin 사이트에 접속하여 로그인하면 다음과 같이 Person 이 보이는 것을 확인할 수 있습니다.
+
+```python
+python manage.py runserver
+```
+
+![/media/drf_tutorial/Screen_Shot_2020-09-11_at_11.05.29_AM.png](/media/drf_tutorial/Screen_Shot_2020-09-11_at_11.05.29_AM.png)
+
+어드민 사이트에서 Person 인스턴스를 직접 생성할 수 있습니다. 저는 다음과 같이 `Deasung`, `Nayoung`, `Eunsu` 세 Person 인스턴스를 생성하였습니다.
+
+![/media/drf_tutorial/Screen_Shot_2020-09-11_at_11.08.30_AM.png](/media/drf_tutorial/Screen_Shot_2020-09-11_at_11.08.30_AM.png)
+
+## 3. 모델 Serialize 하기
+
+모델을 생성하였으므로, 이를 우리 장고 앱에서 활용 가능한 상태로 Serialize 하도록 설정해줍시다. 먼저 `djangorestframework` 를 프로젝트에 설치해주어야 합니다.
+
+```python
+pip install djangorestframework
+```
+
+그리고 `INSTALLED_APPS` 에 추가하여 해당 패키지를 사용하겠단 것을 알려주어야 합니다
+
+```python
+INSTALLED_APPS = [
+	# ... 생략
+	'rest_framework',
+]
+```
+
+그럼 이제 우리가 해야할 일은 REST 프레임워크에 우리 모델을 어떻게 serialize 해야하는지 알려주는 것입니다. `myapi/serializers.py` 에 다음과 같이 코드를 작성해주세요.
+
+```python
+from rest_framework import serializers
+
+from .models import Person
+
+class PersonSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = Person
+        fields = ('id', 'name', 'alias')
+```
+
+여기서 단계별로 들여다보면, REST 프레임워크의 serializer 를 가져와서 Person 모델과 serializer 를 'link' 하는 클래스 `PersonSerializer` 를 만들었습니다.
+
+Serializer 에 대해 부연설명하면, REST 프레임워크에서 기본적으로 제공하는 serializer 로, 이 외에 ModelSerializer, HyperlinkedModelSerializer 등이 있습니다. Serializer 에 대한 더 자세한 설명은 아래 링크를 참고해주세요.
+
+[Serializer in Django REST Framework](https://www.notion.so/Serializer-in-Django-REST-Framework-37b46c0854774ba196184168eabb42bd)
+
+## 4. 뷰 만들기
+
+자, 이제 URL 과 열결해서 데이터를 전달할 뷰를 만들도록 합시다. 우리 Person 모델에 있는 서로 다른 인스턴스들을 보여주기 위해선, 우선 모든 Person 인스턴스를 쿼리하고 이를 Serializer 할 수 있어야 합니다. 그러므로 다음과 같이 `myapi/views.py` 를 작성해주세요.
+
+```python
+from rest_framework import viewsets
+
+from .serializers import PersonSerializer
+from .models import Person
+
+class PersonViewSet(viewsets.ModelViewSet):
+    queryset = Person.objects.all().order_by('name')
+    serializer_class = PersonSerializer
+```
+
+그런 다음 URL 만 연결해주면 끝납니다. 우선 myapi 앱을 root URLconf 에 추가해줍시다.
+
+```python
+from django.contrib import admin
+from django.urls import path, include
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('', include('myapi.urls'))
+]
+```
+
+그런 다음 우리 app 내에서 url 과 뷰를 연결해주면 됩니다.
+
+```python
+from django.urls import include, path
+
+from rest_framework import routers
+from . import views
+
+router = routers.DefaultRouter()
+router.register(r'persons', views.PersonViewSet)
+
+# Wire up our API using automatic URL routing.
+# Additionally, we include login URLs for the browsable API.
+urlpatterns = [
+    path('', include(router.urls)),
+    path('api-auth/', include('rest_framework.urls', namespace="rest_framework"))
+]
+```
+
+그러면 모든 준비가 끝났습니다. [http://localhost:8000](http://localhost:8000) 에 접속하면 다음과 같이 browsable API 를 볼 수 있습니다.
+
+![/media/drf_tutorial/Screen_Shot_2020-09-11_at_6.10.15_PM.png](/media/drf_tutorial/Screen_Shot_2020-09-11_at_6.10.15_PM.png)
+
+또 [http://127.0.0.1:8000/persons/](http://127.0.0.1:8000/persons/) 에 접속하면 모든 person 을 볼 수 있습니다. 또 [http://localhost:8000/persons/1](http://localhost:8000/persons/1) 에 접속하면 처음 만들어진 person 을 볼 수 있습니다. 이처럼 하나의 ModelViewSet 을 쓰면서도 여러 뷰를 전달받을 수 있는 것은 router 가 자동으로 만들어주기 떄문이고, POST 로 새로운 person 을 만들수도 있는데 이는 ViewSet 이 제너릭으로 CRUD 연산을 지원하기 때문입니다.
+
+## References
+
+- [Build your first REST API with Django REST Framework](https://medium.com/swlh/build-your-first-rest-api-with-django-rest-framework-e394e39a482c)
+
+- [Django REST Framework Quickstart](https://www.django-rest-framework.org/tutorial/quickstart/)

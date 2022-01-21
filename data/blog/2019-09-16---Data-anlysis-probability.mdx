@@ -1,0 +1,322 @@
+---
+title: 데이터 과학을 위한 확률 한 번에 이해하기
+summary: 데이터 과학을 위한 확률의 기초적인 내용에 대해 공부해 봅시다
+date: '2019-09-16T00:00:00.000Z'
+draft: false
+slug: 'basic-statistics-and-probability-for-data-science'
+category: Data Science
+tags:
+  - Data
+  - Data Science
+  - Probability
+  - Statistics
+socialImage: '/media/statistics.jpeg'
+---
+
+> _확률 법칙은 일반적으로 보면 굉장히 맞지만, 구체적으로 보면 굉장히 틀리다 - 에드워드 기본_
+
+# 확률(Probability)이란?
+
+**어떠한 사건의 공간에서 특정 사건이 선택될 때 발생하는 불확실성을 수치로 나타낸 것입니다.**
+
+예를 들어, '주사위를 던져서 1 이 나오는 경우' 혹은 '주사위를 던져서 짝수가 나오는 경우'는 '주사위를 던지는' 사건의 공간에서 발생할 수 있는 사건입니다.
+
+# 종속성과 독립성
+
+사건 A 의 발생 여부가 사건 B 의 발생 여부에 대한 정보를 제공한다면, 두 사건 A 와 B 는 종속 사건(dependent events)입니다. 그렇지 않다면 두 사건은 독립 사건(independent events)입니다.
+
+독립 사건의 경우 수학적으로 다음과 같이 표현할 수 있습니다.
+
+$$P(A\cap B) = P(A)P(B)$$
+
+# 조건부 확률
+
+사건 B 가 발생했을 때 사건 A 가 발생할 확률은 사건 B 의 영향을 받아 변하게 될 수도 있습니다. **조건부 확률은 어떤 사건 B 가 일어났을 때(여기서 $P(B) > 0$ 으로 가정합니다) 사건 A 가 일어날 확률을 의미합니다**. 수식으로는 다음과 같이 정의 됩니다.
+
+$$P(A|B) = \frac {P(A\cap B)}{P(B)}$$
+
+비슷한 원리로 만약 $P(A) >$ 0 이라면 **사건 A 가 발생했을 때 사건 B 가 발생할 확률**은 다음과 같이 나타낼 수 있습니다.
+
+$$P(B|A) = \frac {P(A\cap B)}{P(A)}$$
+
+위의 두 식에 간단한 곱셈을 적용하여 우리는 아래의 식을 유추해 낼 수 있습니다.
+
+$$P(A\cap B)=P(B|A)P(A)=P(A|B)P(B)$$
+
+# 베이즈 정리
+
+베이즈 정리를 정확히 배우기 전에 먼저 **분할(Partition)** 이라는 개념을 공부해야 합니다. K 개의 집합 $B_1,...,B_K$가 어떤 집합 $S$의 분할이 되려면 두 조건을 만족해야 합니다.
+
+1. **$B_1,...,B_K$ 는 각각 서로소**여야 합니다. 이는 무작위로 두 개를 뽑았을 때 겹치는 부분이 없어야 한다는 뜻입니다.
+2. **K 개의 $B_1,...,B_K$ 를 합집합 하였을 때 그 집합은 정확히 S 가 되어야 합니다**. 이 두 조건을 만족해야 $B_1,...,B_K$ 를 $S$의 분할이라고 할 수 있습니다.
+
+아래 그림에서 집합 $A_1,A_2,A_3,A_4$ 는 각각 서로 **겹치는 부분이 없고** **합집합을 했을 때 $A$가 되므로** 이들은 **$A$의 분할**이라고 할 수 있습니다.
+
+<figure>
+  <img
+    src="https://user-images.githubusercontent.com/31213226/64953860-f78b5400-d8be-11e9-94d9-a63c43f3686c.png"
+    alt=""
+  />
+  <figcaption style={{ color: 'grey' }}>
+    출처: 술술 읽히는 금융공학 시리즈(http://blog.naver.com/anthouse28/221077405435)
+  </figcaption>
+</figure>
+
+이제 K 개의 집합 $B_1, B_2, ...B_k$가 어떤 사건 $S$의 분할이라고 합시다. 그러면 모든 $S$의 부분집합 $A$에 대해서 다음과 같은 식이 성립하게 됩니다.
+
+$$A=(A\cap B_1) \cup \cdots \cup (A\cap B_k)$$
+
+괄호안의 사건들이 각각 서로소이기 때문에 사건 $A$가 일어날 확률은 아래 식과 같이 계산할 수 있습니다.
+
+$$P(A)=P(A\cap B_1) + \cdots + P(A\cap B_k)$$
+
+따라서 어떤 $A$라는 사건이 일어났을 때 Bj 라는 사건이 일어날 조건부 확률은 다음과 같이 계산할 수 있습니다.
+
+$$P(B*j|A) = \frac{P(A|B_j)P(B_j)}{P(A)}=\frac{P(A|B_j)P(B*{j})}{P(A|B_1)P(B1)+\cdots+P(A|B_K)P(B_K)}$$
+
+위의 식을 일반적으로 **베이즈 정리** 라고 합니다. 즉, 사건 $A$가 일어났을 때의 확률 `P(Bj|A)` 를 계산 함에 있어서 이를 거꾸로 뒤집어 $B$가 일어났을 때의 확률 `P(A|Bj)` 로 표현할 수 있다는 것입니다.
+
+예를 들어, 10,000 명 중에 1 명이 걸리는 질병이 있다고 가정해 봅시다. 이때 질병이 있는 경우 '양성', 질병이 없는 경우 '음성' 이라 판단하는 검사가 99% 정확도로 판단을 내린다고 해봅시다.
+
+그렇다면 양성 판정을 받았다는 것은 무엇을 의미할까요? 사건 $T$는 양성 판정을 나타내고, 사건 $D$는 질병에 걸렸다는 것을 나타낸다고 해봅시다. $¬E$는 사건 $E$가 발생하지 않는 경우를 나타낸다고 해봅시다.
+
+양성 판정인 경우, 실제 질병에 걸렸을 확률을 베이즈 정리를 사용해서 풀어보면 다음과 같습니다.
+
+$$P(D|T)=\frac{P(D\cap T)}{P(T)}=\frac{P(T|D)P(D)}{P(T)}=\frac{P(T|D)P(D)}{P(T\cap D)+P(T\cap ¬D)}=\frac{P(T|D)P(D)}{P(T|D)P(D)+P(T|¬D)P(¬D)}$$
+
+**최종 전개된 모습을 보면, `P(D|T)` 를 `P(T|D)` 형태로 '뒤집어서' 나타난 것을 확인할 수 있습니다**. 질병에 걸린 사람이 양성 판정을 받을 확률인 `P(T|D)`는 0.99 이고, 질병에 걸릴 확률인 `P(D)`는 0.0001 임을 알고 있습니다. 또한 질병에 걸리지 않을 확률인 `P(¬D)`는 0.9999 임도 알고 있습니다. 마지막으로 질병에 걸리지 않은 사람들이 양성 판정을 받을 확률인 `P(T|¬D)`는 0.01 임을 알고 있습니다. 이를 대입하여 `P(D|T)`를 구해보면 다음과 같이 계산됩니다.
+
+$$P(D|T) = 0.98$$
+
+즉, 양성 판정을 받은 사람들 중에서 실제로 질병에 걸린 사람은 단 1%안 된다는 것을 의미합니다!
+
+이처럼 **베이즈 정리는 새로운 정보에 대해 어떻게 대응하여 결과를 도출 해낼 지를 알려주는 강력한 도구** 이기 때문에 매우 중요합니다 :)
+
+# 확률 변수
+
+**확률변수(random variable)란 특정 확률분포와 연관되어 있는 변수를 의미합니다.**
+
+주사위를 두 개 던졌을 때, 두 눈의 합이 2 가 될 확률은 1/36 입니다. 그럼 이 상황에서 두 눈의 합이 X 가 될 확률은? 표본공간에 대해 각 눈의 합을 정리한 표는 다음과 같습니다.
+
+<figure>
+  <img
+    src="https://user-images.githubusercontent.com/31213226/64954076-7bddd700-d8bf-11e9-8f67-740cf1b27bc1.png"
+    alt=""
+  />
+  <figcaption style={{ color: 'grey' }}>
+    출처: 네이버 블로그: Life is Journey(https://blog.naver.com/freewheel3)
+  </figcaption>
+</figure>
+
+여기서 눈의 합이 2 에서 12 로 다양하게 존재하는데, 이렇게 **두 눈의 합을 변수 $X$로 놓을 수가 있습니다. 이때 $X$가 확률 변수**가 됩니다.
+
+앞에서 두 눈의 합이 2 인 사건은 $X=2$라 표현하고, 이에 대한 확률은 $P(X=2)$로 나타낼 수 있습니다.
+
+즉 **확률변수 $X$가 특정한 값으로 정해질 때, 그에 따른 확률이 각각 대응**된다고 볼 수 있습니다.
+
+<figure>
+  <img
+    width="300"
+    src="https://user-images.githubusercontent.com/31213226/64954275-0aeaef00-d8c0-11e9-8f5e-7f8d20a41df3.png"
+    alt=""
+  />
+  <figcaption style={{ color: 'grey' }}>
+    출처: 네이버 블로그: Life is Journey(https://blog.naver.com/freewheel3)
+  </figcaption>
+</figure>
+
+위 그림과 같이 **정의역은 확률 변수가 가질 수 있는 값들이고, 치역은 그에 따른 확률로, 함수 관계로 나타낼 수 있다. 바로 이러한 분포를 확률분포**라고 합니다.
+
+확률 변수는 이산적인 값을 가지는 이산확률변수와 연속적인 값을 가지는 연속확률변수로 나뉠 수 있다. 이산확률변수는 확률질량함수라는 확률 분포를 따릅니다.
+
+**참고 자료**
+
+이산확률변수의 확률분포, 이산확률분포 자료
+
+[Life is Journey : 네이버 블로그](http://freewheel3.blog.me/220846852139)
+
+# 연속 분포
+
+주사위 던지기 예와 같이 확률 변수가 이산적인 값을 가질 떄는 이산확률분포를 따릅니다. 그런데 **결과가 이산적이지 않고 실수의 범위에서 연속적인 값을 가지는 확률변수를 연속확률변수**라고 하고, **확률밀도함수(probability density function, pdf)라는 확률분포를 따릅니다**. 이 때 연속확률변수 $X$는 확률밀도함수가 $f(x)$인 확률분포를 따른다 라고 표현할 수 있습니다.
+
+<figure>
+  <img
+    src="https://user-images.githubusercontent.com/31213226/64954322-3077f880-d8c0-11e9-82ce-f9849e35173a.jpg"
+    alt=""
+  />
+  <figcaption style={{ color: 'grey' }}>
+    출처: 네이버 블로그: Life is Journey(https://blog.naver.com/freewheel3)
+  </figcaption>
+</figure>
+
+위 그림처럼 확률밀도함수는 특정 구간에서 적분한 값으로 확률을 나타냅니다.
+연속확률분포 중 균등분포(uniform distribution)가 존재하는데, 0 과 1 사이의 모든 값에 동등한 비중을 준 분포입니다.
+
+```python
+def uniform_pdf(x):
+		return 1 if x >= 0 and x < 1 else 0
+```
+
+또 누적분포함수(cumulative distribution function, cdf)는 확률변수의 값이 특정 값보다 작거나 클 확률을 나타냅니다.
+
+```python
+def uniform_cdf(x):
+		if x < 0 : return 0 # 균등분포의 확률은 절대로 0보다 작을 수 없음
+		elif x < 1 : return x # 예시: P(X<=0.4) = 0.4
+		else : return 1 # 균등분포의 확률은 항상 1 보다 작음
+```
+
+아래 그림은 균등분포함의 누적분포함수를 동시에 나타낸 것입니다.
+
+<figure>
+  <img
+    width="500"
+    src="https://user-images.githubusercontent.com/31213226/64954413-75039400-d8c0-11e9-8087-6bfa9192a2dd.png"
+    alt=""
+  />
+  <figcaption style={{ color: 'grey' }}>
+    출처: 네이버 블로그: Life is Journey(https://blog.naver.com/freewheel3)
+  </figcaption>
+</figure>
+
+# 정규분포
+
+정규분포(Normal distribution)는 연속확률변수 $X$의 평균이 $m$이고, 표준편차가 $σ$인 함수로 표현되며 수식은 아래와 같습니다.
+
+$$f(x)=\frac{1}{\sqrt{2π}σ}e^{-\frac{(x-m)^2}{2σ^2}}~(x 는 ~모든~실수)$$
+
+기호로는 $X~N(m, σ^2)$으로 표현합니다. 변량 $x$에 해당하는 확률 $f(x)$가 $m$과 $σ$에 의해 다르게 그려진다는 걸 알 수 있습니다. 정규분포를 그림으로 나타내면 다음과 같습니다.
+
+<figure>
+  <img
+    width="500"
+    src="https://user-images.githubusercontent.com/31213226/64954529-d9265800-d8c0-11e9-86b6-7fee31339bcc.jpg"
+    alt=""
+  />
+  <figcaption style={{ color: 'grey' }}>
+    출처: 네이버 블로그: Life is Journey(https://blog.naver.com/freewheel3)
+  </figcaption>
+</figure>
+
+이 때, 평균 $m$과 표준편차 $σ$에 따라 그 모양이 어떻게 달라지는지 확인해 봅시다.
+
+<figure>
+  <img
+    width="500"
+    src="https://user-images.githubusercontent.com/31213226/64954570-0246e880-d8c1-11e9-8912-94957e0a2ea2.jpg"
+    alt=""
+  />
+  <figcaption style={{ color: 'grey' }}>
+    출처: 네이버 블로그: Life is Journey(https://blog.naver.com/freewheel3)
+  </figcaption>
+</figure>
+
+<figure>
+  <img
+    width="500"
+    src="https://user-images.githubusercontent.com/31213226/64954606-17bc1280-d8c1-11e9-9500-7c22e7e60dc1.jpg"
+    alt=""
+  />
+  <figcaption style={{ color: 'grey' }}>
+    출처: 네이버 블로그: Life is Journey(https://blog.naver.com/freewheel3)
+  </figcaption>
+</figure>
+
+표준편차가 일정할 때 평균이 다른 경우, 평균에 따라서 그래프가 평행이동한다는 것을 알 수 있습니다. 또한 평균이 일정할 때 표준편차가 달라지면 대칭축은 유지된 채 퍼진 정도가 달라진다는 것을 알 수 있습니다.
+
+정규분포곡선의 성질을 정리하면 다음과 같습니다.
+
+<figure>
+  <img
+    src="https://user-images.githubusercontent.com/31213226/64954655-37ebd180-d8c1-11e9-8580-6a8c6a5f27fc.jpg"
+    alt=""
+  />
+  <figcaption style={{ color: 'grey' }}>
+    출처: 네이버 블로그: Life is Journey(https://blog.naver.com/freewheel3)
+  </figcaption>
+</figure>
+
+## 표준정규분포
+
+정규분포의 확률은 표준정규분포표를 활용하여 계산할 수 있습니다. 이 때 표준정규분포란 평균이 0 이고 표준편차가 1 인 정규분포를 의미합니다. 즉, $N(0, 1)$입니다.
+
+위에서 제시한 정규분포 수식에 $m = 0, σ =1$ 을 대입하면 수식은 다음과 같이 변형됩니다.
+
+$$f(x) = \frac{1}{\sqrt{2π}}e^{-\frac{x^2}{2σ^2}}~(m=0,~σ=1~일~때)$$
+
+표준정규분포의 그래프를 그림으로 나타내면 다음과 같습니다.
+
+<figure>
+  <img
+    src="https://user-images.githubusercontent.com/31213226/64954695-58b42700-d8c1-11e9-9551-352b00b0788g"
+    alt=""
+  />
+  <figcaption style={{ color: 'grey' }}>
+    출처: 네이버 블로그: Life is Journey(https://blog.naver.com/freewheel3)
+  </figcaption>
+</figure>
+
+그래프를 보면 y 축으로 대칭이 되고, 변수를 x 가 아닌 z 로 나타냅니다. 이는 혼동을 피하기 위함입니다. $Z$에 대한 이야기는 잠시 뒤에 하기로 하고, 이 표준정규분포에서의 확률은 다음과 같이 계산할 수 있습니다.
+
+<figure>
+  <img
+    width="600"
+    src="https://user-images.githubusercontent.com/31213226/64954738-71244180-d8c1-11e9-8c66-1822eccf2d82.jpg"
+    alt=""
+  />
+  <figcaption style={{ color: 'grey' }}>
+    출처: 네이버 블로그: Life is Journey(https://blog.naver.com/freewheel3)
+  </figcaption>
+</figure>
+
+여기에 나와있는 확률은 $P(0≤Z≤x)$입니다. 만약 $P(0≤Z≤1.55)$를 구하고 싶으면 그림에서 파란색으로 그려놓은 부분이 됩니다. 1.00 과 2.00 그리고 3.00 을 구하려면 빨간색 동그라미 친 부분을 읽으면 됩니다.
+
+여기에서 일반적인 정규분포와 표준정규분포 사이의 관계를 이야기 할 필요가 있습니다. 표준정규분포의 확률을 계산하는 방법을 알았으니, 우리가 할 일은 이제 정규분포를 표준정규분포로 바꾸어 주는 것입니다. 이러한 과정을 바로 표준화 라고 합니다. 그래서 어떻게 구하냐구요?
+
+$x = m$이 대칭축이던 정규분포 그래프를 $x = 0$으로 평행이동 시켜주고, $σ$의 값 만큼 퍼져있던 그래프의 폭을 $σ=1$이 되게 만들어 주면 됩니다. 즉, 확률변수에서 평균을 빼고, 표준편차로 나누어 주면 표준정규분포인 $N(0, 1)$이 됩니다.
+
+<figure>
+  <img
+    src="https://user-images.githubusercontent.com/31213226/64954798-9618b480-d8c1-11e9-9845-9cbd89305f29.png"
+    alt=""
+  />
+  <figcaption style={{ color: 'grey' }}>
+    출처: 네이버 블로그: Life is Journey(https://blog.naver.com/freewheel3)
+  </figcaption>
+</figure>
+
+이렇게 하여 정규분포를 표준정규분포로 표준화 시킨 후, 표준정규분포표를 활용해서 정규분포의 확률을 계산할 수 있습니다.
+
+# 중심극한정리
+
+중심극한정리는 동일한 분포에 대한 독립적인 확률변수의 평균을 나타내는 확률변수가 대략적으로 정규분포를 따른다는 정리입니다. 이해를 돕기 위해 이항분포를 생각해 봅시다. 이항분포의 경우 변량간의 텀을 좁히면 정규분포에 가까워 집니다. 이를 정리한 그림은 아래와 같습니다.
+
+<figure>
+  <img
+    width="600"
+    src="https://user-images.githubusercontent.com/31213226/64954857-b47eb000-d8c1-11e9-9197-65cd07567d8c.jpg"
+    alt=""
+  />
+  <figcaption style={{ color: 'grey' }}>
+    출처: 네이버 블로그: Life is Journey(https://blog.naver.com/freewheel3)
+  </figcaption>
+</figure>
+
+잘 감이 잘 오지 않을 것 같아서 그림을 하나 더 준비했습니다. 주사위를 하나 던졌을 때, 1 의 눈이 나올 확률(1/6)을 시행 횟수가 10, 30, 50 일 때의 각 그래프를 나타낸 그림은 다음과 같습니다.
+
+<figure>
+  <img
+    width="500"
+    src="https://user-images.githubusercontent.com/31213226/64954895-cd876100-d8c1-11e9-9c2e-a30ecbdf255f.jpg"
+    alt=""
+  />
+  <figcaption style={{ color: 'grey' }}>
+    출처: 네이버 블로그: Life is Journey(https://blog.naver.com/freewheel3)
+  </figcaption>
+</figure>
+
+시행횟수가 많아질수록 정규분포 그래프 모양과 가까워 지는 것을 확인할 수 있습니다! 즉, 시행횟수가 많은 이항분포는 표준화 과정을 거쳐 확률을 쉽게 계산할 수 있습니다.
+
+# Review
+
+지금까지 데이터 과학의 선수지식 중 확률에 대한 내용을 간략하게 살펴보았습니다. 다음 포스팅에서는 이러한 확률 이론을 바탕으로 가설을 검정하고 통계적 추론하는 방법에 대해서 알아보도록 합시다.

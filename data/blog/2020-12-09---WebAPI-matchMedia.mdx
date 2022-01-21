@@ -1,0 +1,132 @@
+---
+title: Javascript 로 미디어 쿼리를 쓰는 방법, window.matchMedia
+summary: window.matchMedia API와 Javascript를 활용하여 미디어 쿼리를 programmatic하게 사용하는 방법에 대해서 알아봅시다.
+date: '2020-12-09T20:00:00.000Z'
+draft: false
+slug: 'how-to-use-media-query-with-javascript-matchmedia'
+category: Frontend
+tags:
+  - Frontend
+  - web
+  - javascript
+socialImage: '/media/javascript.jpeg'
+---
+
+CSS 에서만 미디어 쿼리를 사용하지 않고 JS 에서도 programmatic 하게 미디어 쿼리를 사용할 필요가 생겨서 알아보던 중 `window.matchMedia` 가 그 역할을 한다는 것을 알게됬다.
+
+## matchMedia
+
+`matchMedia()` 함수는 `window` 내장 메서드로, 파라미터로 string 형태의 미디어 쿼리를 받아서 현재 `document` 가 해당 미디어 쿼리를 충족하는지 알 수 있는 `MediaQueryList` 객체를 반환한다.
+
+### Examples
+
+```jsx
+const mediaQueryList = window.matchMedia('(max-width: 600px)')
+```
+
+## MediaQueryList
+
+MediaQueryList(미디어 쿼리 리스트) 는 특정 document 에 적용된 media query 에 관한 정보를 포함하는 객체이다. MediaQueryLIst 는 `matches`, `media` 두 프로퍼티를 포함한다.
+
+- `MediaQueryList.matches`
+  - 해당 document 가 주어진 미디어 쿼리를 만족하는지 여부로, boolean 값이다.
+- `MediaQueryList.media`
+  - 주어진 미디어 쿼리를 string 으로 serialize 한 값이다.
+
+미디어 쿼리 리스트는 `change` 이벤트를 발생시킬 수 있다. 이 `change` 이벤트를 핸들링하는 이벤틑 리스너를 추가해주면 주어진 미디어 쿼리를 충족하는지 watch 할 수 있고, 결과적으로 programmatic 하게 미디어 쿼리를 사용할 수 있다.
+
+### Examples
+
+```tsx
+// 600px 보다 크면 matches 가 false, 크면 true 가 되는 미디어 쿼리 리스트 생성
+const mediaQueryList = window.matchMedia(`(max-width: 600px)`)
+
+// document 가 미디어 쿼리를 충족시키는것에 대해 변화가 생기면 콘솔에 로깅한다
+const changeHandler = (e: MediaQueryListEvent) => {
+  console.log('changed!')
+}
+
+// 600px 을 기준으로 document width 가 바뀔 때 마다 이벤트 핸들러를 호출한다
+mediaQueryList.addEventListener('change', changeHandler)
+```
+
+### React hook implementation
+
+React에서 미디어 쿼리를 programmatic 하게 사용할 수 있도록 하는 `useMediaQuery` 라는 이름의 custom hook 을 만들고자 한다면 다음과 같이 사용할 수 있다.
+
+```tsx
+/**
+ * window.matchMedia 를 활용하여 programmatically 하게 media query 를 활용하도록 하는 hook
+ * References: https://developer.mozilla.org/en-US/docs/Web/API/Window/matchMedia
+ */
+import { useState, useEffect } from 'react'
+
+export interface UseMediaQueriesProps {
+  breakpoint: number
+}
+
+const useMediaQueries = ({ breakpoint }: UseMediaQueriesProps) => {
+  /**
+   * 주어진 breakpoint 보다 화면이 작을 경우 match 를 true 로 초기화 시킨다
+   */
+  const [mediaQuery, setmediaQuery] = useState<Partial<MediaQueryListEvent>>({
+    matches: window.innerWidth < breakpoint ? true : false,
+    media: '',
+  })
+
+  useEffect(() => {
+    /**
+     * window.matchMedia 에 쿼리를 전달하여 받은 mediaQueryList 를 가져오고
+     * change event handler 를 달아서 주어진 미디어 쿼리를 기반해서 viewport 가 breakpoint 사이에서 변화가 있다면
+     * 콜백 함수로 주어진 changeHandler 를 호출한다
+     * References: https://developer.mozilla.org/en-US/docs/Web/API/MediaQueryList
+     */
+    const mediaQueryList = matchMedia(`(max-width: ${breakpoint}px)`)
+
+    const changeHandler = (e: MediaQueryListEvent) => {
+      setmediaQuery(e)
+    }
+
+    // for chrome, firefox and modern browsers
+    try {
+      mediaQueryList.addEventListener('change', changeHandler)
+    } catch (error) {
+      try {
+        // IE 는 onChange 를 아예 지원하지 않아서 지금은 deprecated 된 addListener 를 사용해야 한다
+        mediaQueryList.addListener(changeHandler)
+      } catch (error2) {
+        // 그래도 error 가 나면 sentry 로
+        console.error(error2)
+      }
+    }
+
+    return () => {
+      // for addEventListener
+      mediaQueryList.removeEventListener('change', changeHandler)
+      // for addListener
+      mediaQueryList.removeListener(changeHandler)
+    }
+  }, [])
+
+  return {
+    mediaQuery,
+  }
+}
+
+export default useMediaQueries
+```
+
+## Browser Supports
+
+아래 그림에서 알 수 있듯이 `MediaQueryList` 는 기본적으로 대부분의 브라우저를 지원한다. 다만 IE 의 경우 `change` 이벤트를 발생시키지 않기 때문에, IE 에서는 `addListener()` 로 이벤트 핸들러를 달아주어야 한다.
+
+<figure>
+  <img src="/media/matchmedia/Screen_Shot_2020-12-04_at_6.21.51_PM.png" />
+  <figcaption style={{ color: 'grey' }}>mediaQueryList 의 브라우저 호환 현황</figcaption>
+</figure>
+
+## References
+
+- [Window.matchMedia()](https://developer.mozilla.org/en-US/docs/Web/API/Window/matchMedia)
+
+- [MediaQueryList](https://developer.mozilla.org/en-US/docs/Web/API/MediaQueryList)

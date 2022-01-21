@@ -1,0 +1,264 @@
+---
+title: Pandas에서 Aggregate하기
+summary: Pandas의 Aggregates에 대해서 알아봅시다
+date: '2019-09-27T00:00:00.000Z'
+draft: false
+slug: 'aggregating-data-with-pandas'
+category: Data Science
+tags:
+  - TIL
+  - Python
+  - Data Science
+  - Pandas
+---
+
+이번 포스팅에서는 Pandas 의 *Aggregates*에 대해서 알아봅시다. *Aggregates*는 숫자로 구성된 특정 그룹을 설명할 수 있는 단일 숫자를 만들어내는 강력한 방법입니다. 일반적으로 평균, 표준편차, 중간값 등이 자주 사용됩니다.
+
+# Calculating Column Statistics
+
+저번 포스팅에서는 `apply` 함수를 활용하여 특정 column 의 각 value 에 대해 연산을 수행하는 방법에 대해서 알아보았습니다. 이번에는 모든 value 에 대해서 연산을 수행하는 방법에 대해서 알아봅시다.
+
+먼저 손님들의 정보를 저장한 `customers`란 *DataFrame*이 있다고 가정해봅시다. 만약 손님들의 나이의 중간값을 구하고자 한다면 다음과 같이 코드를 작성할 수 있습니다.
+
+```python
+print(customers.age)
+>> [23, 25, 31, 35, 35, 46, 62]
+print(customers.age.median())
+>> 35	# 중간값을 반환합니다.
+```
+
+이번에는 물류 배송 정보를 저장한 `shipments`란 *DataFrame*이 있다고 가정해봅시다. 만약 특정 배송지들이 각각 얼마나 배송되었는지를 구하고자 한다면 다음과 같이 코드를 작성할 수 있습니다.
+
+```python
+print(shipments.state)
+>> ['CA', 'CA', 'CA', 'CA', 'NY', 'NY', 'NJ', 'NJ', 'NJ', 'NJ', 'NJ', 'NJ', 'NJ']
+print(shipments.state.nunique())
+>> 3	# unique한 값의 수를 반환합니다.
+```
+
+이번에는 옷가게에서 T-shirt 정보를 저장하는 `inventory` 란 *DataFrame*이 있다고 가정해봅시다. T-shirt 의 색깔로 어떤 것들이 있는지를 구하고자 한다면 다음과 같이 코드를 작성할 수 있습니다.
+
+```python
+print(inventory.color)
+>> ['blue', 'blue', 'blue', 'blue', 'blue', 'green', 'green', 'orange', 'orange', 'orange']
+print(inventory.color.unique())
+>> ['blue', 'green', 'orange']	# unique한 값들을 반환합니다.
+```
+
+이러한 syntax 를 일반화하면 다음과 같습니다.
+
+```python
+df.column_name.command()
+```
+
+자주 쓰이는 command 를 정리한 표는 아래와 같습니다.
+
+| Command   | Description                            |
+| --------- | -------------------------------------- |
+| `mean`    | 특정 column 의 모든 value 의 평균값    |
+| `std`     | 표준편차                               |
+| `median`  | 중간값                                 |
+| `max`     | 특정 column 내 최대값                  |
+| `min`     | 특정 column 내 최소값                  |
+| `count`   | 특정 column 내 value 의 개수           |
+| `nunique` | 특정 column 내 unique 한 value 의 개수 |
+| `unique`  | 특정 column 내 unique 한 value 의 배열 |
+
+# Calculating Aggregate Functions
+
+많은 데이터를 보유하게 된다면, 데이터의 특정 부분에 대해서 _aggregates_ 연산을 수행하고 싶을 때가 종종 있습니다. 예를 들어 다음과 같은 *DataFrame*이 있다고 가정해봅시다.
+
+| student | assignment_name | grade |
+| ------- | --------------- | ----- |
+| Amy     | Assignment 1    | 75    |
+| Amy     | Assignment 2    | 35    |
+| Bob     | Assignment 1    | 99    |
+| Bob     | Assignment 2    | 35    |
+| …       |                 |       |
+
+각 학생들의 평균 grade 를 계산하고 싶다고 해봅시다. 이를 반복문으로도 실행할 수 있지만, Pandas 의 `groupby` 함수를 활용하면 매우 쉽게 연산이 가능합니다.
+
+```python
+grades = df.groupby('student').grade.mean()
+print(grades)
+```
+
+위 코드의 실행 결과는 다음과 같습니다.
+
+| student | grade |
+| ------- | ----- |
+| Amy     | 80    |
+| Bob     | 90    |
+| Chris   | 75    |
+| …       |       |
+
+`.groupby` 함수의 일반적인 syntax 는 다음과 같습니다.
+
+```python
+df.groupby('column1').column2.measurement()
+```
+
+- `column1` 은 그룹으로 만들고자 하는 column 입니다.
+- `column2`는 measurement 를 수행하고자 하는 column 입니다(여기서는 `grade` 가 됩니다).
+- `measurement` 는 적용하고자 하는 함수입니다(여기서는 `mean` 입니다).
+
+`groupby` 함수는 결과값으로 *DataFrame*이 아닌 *Series*를 반환합니다. 이 때 반환된 *Series*의 index 는 `groupby` 함수에 주어진 column 의 value 이며, `name` 속성은 `measurement` 가 수행된 column 의 name 입니다.
+
+그런데 column 의 value 를 index 로 사용하는 것보단 정수값이 주어지는 것이 일반적으로 보기 더 좋습니다. 이를 위해 `reset_index()` 함수를 사용할 수 있는데, 결과적으로 *Series*를 *DataFrame*으로 변환하고 기존의 index 를 column 으로 만들어버립니다.
+
+이러한 장점으로 인해 일반적으로 `groupby` 함수 뒤에는 `reset_index` 함수가 뒤따라옵니다.
+
+```python
+df.groupby('column1').column2.measurement()
+    .reset_index()
+```
+
+이해를 돕기 위해 다음과 같이 찻집의 Tea 정보를 저장하는 *DataFrame*이 있다고 가정해봅시다.
+
+| id  | tea               | category | caffeine | price |
+| --- | ----------------- | -------- | -------- | ----- |
+| 0   | earl grey         | black    | 38       | 3     |
+| 1   | english breakfast | black    | 41       | 3     |
+| 2   | irish breakfast   | black    | 37       | 2.5   |
+| 3   | jasmine           | green    | 23       | 4.5   |
+| 4   | matcha            | green    | 48       | 5     |
+| 5   | camomile          | herbal   | 0        | 3     |
+| …   |                   |          |          |       |
+
+Tea 가 category 별로 얼마나 있는지 확인해보고자 한다면 다음과 같이 코드를 작성할 수 있습니다.
+
+```python
+teas_counts = teas.groupby('category').id.count().reset_index()
+print(teas_counts)
+```
+
+위 코드의 실행 결과는 다음과 같습니다.
+
+|     | category | id  |
+| --- | -------- | --- |
+| 0   | black    | 3   |
+| 1   | green    | 4   |
+| 2   | herbal   | 8   |
+| 3   | white    | 2   |
+| …   |          |     |
+
+`reset_index` 를 호출함으로써 기존의 index 인 category 가 새로운 column 으로 형성된 것을 확인할 수 있습니다. 한 발짝만 더 나가자면, 각 category 별 tea 의 수를 나타내는 컬럼의 name 이 id 인데, 보기 좋게 하기 위해 column 이름을 변경해 줄 수 있습니다.
+
+```python
+teas_counts = teas_counts.rename(columns={"id": "counts"})
+```
+
+이제 *DataFrame*은 다음과 같습니다.
+
+|     | category | counts |
+| --- | -------- | ------ |
+| 0   | black    | 3      |
+| 1   | green    | 4      |
+| 2   | herbal   | 8      |
+| 3   | white    | 2      |
+| …   |          |        |
+
+## Apply with Lambda
+
+가끔은 `mean` 이나 `count` 말고 더 복잡한 연산을 필요로 할 때가 있습니다. 이러한 경우, `apply` 함수를 사용하여 파라미터로 lambda 함수를 제공할 수 있습니다. Column 연산을 수행할때 처럼 말이죠. 한가지 명심해야 할 것은 _Aggregates_ 단계의 `apply` 함수의 파라미터로 주어지는 lambda 함수의 input 은 column 의 값들로 구성된 list 란 것입니다.
+
+이해를 돕기 위해 어떤 회사의 employee 들의 id, 이름, 임금, 직종을 나타내는 다음과 같은 *DataFrame*이 있다고 가정해봅시다.
+
+| id    | name          | wage | category  |
+| ----- | ------------- | ---- | --------- |
+| 10131 | Sarah Carney  | 39   | product   |
+| 14189 | Heather Carey | 17   | design    |
+| 15004 | Gary Mercado  | 33   | marketing |
+| 11204 | Cora Copaz    | 27   | design    |
+| …     |               |      |           |
+
+만약 각 catogory 별로 75th percentile(75%의 employee 보다 임금이 높고 25%의 employee 보다 임금이 낮은 지점)의 임금을 구하고자 한다면 다음과 같이 코드를 작성할 수 있습니다.
+
+```python
+# np.percentile 함수는 입력으로 주어진 list에서 특정 지점의 percentile을 계산합니다.
+high_earners = df.groupby('category').wage.apply(lambda wages: np.percentile(wages, 75)).reset_index()
+```
+
+계산된 `high_earners` 는 다음과 같이 됩니다.
+
+|     | category  | wage |
+| --- | --------- | ---- |
+| 0   | design    | 23   |
+| 1   | marketing | 35   |
+| 2   | product   | 48   |
+| …   |           |      |
+
+## Multiple Groupby
+
+가끔은 여러 column 을 group 하는 경우도 생기게 됩니다. 이는 간단히 `groupby` 함수의 파라미터로 column 의 name 을 list 로 전달해주면 됩니다. 예를 들어 레스토랑 체인점의 판매 기록을 저장하는 다음과 같은 *DataFrame*이 있다고 생각해봅시다.
+
+| Location     | Date       | Day of Week | Total Sales |
+| ------------ | ---------- | ----------- | ----------- |
+| West Village | February 1 | W           | 400         |
+| West Village | February 2 | Th          | 450         |
+| Chelsea      | February 1 | W           | 375         |
+| Chelsea      | February 2 | Th          | 390         |
+| ...          |            |             |             |
+
+만약 각 Location 의 Day of Week 별 Total Sales 의 평균을 계산하고 싶다면 다음과 같이 코드를 작성할 수 있습니다.
+
+```python
+df.groupby(['Location', 'Day of Week'])['Total Sales'].mean().reset_index()
+```
+
+결과는 다음과 같게 됩니다.
+
+| Location     | Day of Week | Total Sales |
+| ------------ | ----------- | ----------- |
+| Chelsea      | M           | 402.50      |
+| Chelsea      | Tu          | 422.75      |
+| Chelsea      | W           | 452.00      |
+| …            |             |             |
+| West Village | M           | 390         |
+| West Village | Tu          | 400         |
+| …            |             |             |
+
+# Pivot Tables
+
+`groupby` 를 수행하고 난 뒤, 가끔 데이터를 저장하는 방식을 변경하고 싶을수도 있습니다. 바로 이전의 레스토랑 *DataFrame*의 경우, 다음과 같이 표현할 수 있다면 더 가독성이 높아질 것입니다.
+
+| Location     | M   | Tu  | W   | Th  | F   | Sa  | Su  |
+| ------------ | --- | --- | --- | --- | --- | --- | --- |
+| Chelsea      | 400 | 390 | 250 | 275 | 300 | 150 | 175 |
+| West Village | 300 | 310 | 350 | 400 | 390 | 250 | 200 |
+| …            |     |     |     |     |     |     |     |
+
+이렇게 테이블을 reorganizing 하는 방법을 **pivoting** 이라고 합니다. 그리하여 새롭게 생성된 테이블을 **pivot table** 이라고 부릅니다. Pandas 에서는 다음과 같이 pivot 을 수행할 수 있습니다.
+
+```python
+df.pivot(columns='ColumnToPivot',
+         index='ColumnToBeRows',
+         values='ColumnToBeValues')
+```
+
+레스토랑 *DataFrame*의 경우 다음과 같이 코드를 작성할 수 있습니다.
+
+```python
+# 먼저 groupby 연산을 수행합니다.
+unpivoted = df.groupby(['Location', 'Day of Week'])['Total Sales'].mean().reset_index()
+# 그런 다음 pivot table을 만듭니다.
+pivoted = unpivoted.pivot(
+    columns='Day of Week',
+    index='Location',
+    values='Total Sales')
+```
+
+`pivot` 함수는 실행 결과로 *DataFrame*을 반환합니다. 이때 indexing 이 이상하게 만들어지는 경향이 있어서, 일반적으로 `pivot` 뒤에도 `reset_index` 를 호출해줍니다.
+
+# Review
+
+이번 포스팅에서는 Pandas 의 *Aggregates*에 대한 많은 내용을 다루어보았습니다. 그 내용을 정리해보면 다음과 같습니다:
+
+- How to perform _aggregate_ statistics over individual rows with the same value using `groupby`.
+- How to rearrange a _DataFrame_ into a _pivot table_, a great way to compare data across two dimensions.
+
+Pandas 는 공부할수록 재미있는 라이브러리인 것 같습니다. 얼른 실생활에 널려있는 데이터를 분석하고 싶어지지 않나요?😄
+
+# References
+
+- [Codecademy](http://www.codecademy.com)

@@ -1,0 +1,151 @@
+---
+title: Typescript at a glance
+summary: 정적 타이핑을 지원하는 Javascript 의 superset 인 Typescript 에 대해서 알아봅시다.
+date: '2020-06-04T01:00:00.000Z'
+draft: false
+slug: 'typescript-at-a-glance'
+category: Frontend
+tags:
+  - Frontend
+  - Typescript
+  - Javascript
+socialImage: '/media/typescript.png'
+---
+
+> TypeScript is a typed superset of JavaScript that compiles to plain JavaScript.
+> Any browser. Any host. Any OS. Open source.
+
+Typescript는 Javascript의 프로토타입, 동적 타이핑 등과 독특한 언어적 특징으로 인해 디버깅이 어렵고 유지 보수가 힘든 문제를 개선하고자 Microsoft에서 2012년 발표한 오픈소스 언어입니다. Typescript의 장점으로 다음과 같은 것들이 있습니다.
+
+- 정적 타이핑
+- 인터페이스, 제네릭 등 객체지향 프로그래밍 지원
+- ES6+ 지원
+
+<figure>
+  <img
+    style={{ width: '360px', objectFit: 'contain' }}
+    alt="Typescript"
+    src="/media/typescript/ts_superset.png"
+  />
+  <figcaption style={{ color: 'grey' }}>Typescript as superset of Javscript</figcaption>
+</figure>
+
+Typescript는 기존 Javascript문법을 그대로 사용할 수 있고, Babel과 같은 별도의 transpiler없이 ES6의 기능을 브라우저 또는 Node.js에서 사용할 수 있습니다. 지금부터는 Typescript의 간단한 사용법과 특징에 대해서 알아보도록 하겠습니다.
+
+# Getting Started
+
+이번 포스팅에서는 직접 Typescript코드를 작성해보고, 이를 컴파일해보면서 원리를 이해하는 시간을 가져봅시다.
+
+## Installing Typescript
+
+Typescript 는 npm또는 yarn으로 설치할 수 있습니다. 여기서는 npm으로 global하게 설치해주겠습니다.
+
+```sh
+> npm install -g typescript
+# typescript 를 설치하면 컴파일러인 tsc 도 함께 설치됩니다.
+# 제대로 설치되었는지 확인하기 위해 version 을 확인해줍시다.
+> tsc -v # 3.9.3
+```
+
+## Compile First Typescript code
+
+다음과 같이 `hello.ts` 파일을 만들어줍시다.
+
+```ts
+function Hello(name) {
+  console.log('hello!' + name)
+}
+Hello('David')
+```
+
+확장자가 `.ts` 면 해당 파일이 Typescript 로 작성되었음을 의미합니다. 이제 이 코드를 방금 설치한 `tsc` 로 컴파일 해봅시다.
+
+```sh
+> tsc hello.ts
+```
+
+그러면 `hello.ts` 가 위치한 directory에 `hello.js` 가 새롭게 생성됩니다. `hello.js` 를 보면 `hello.ts` 와 코드가 동일합니다. 즉, Typescript 는 컴파일되어 Javscript 코드로 변환됩니다. Typescript 자체가 Javascript 이기 때문에, 언어의 이름이 다르다고 어렵게 생각하지 않아도 됩니다.
+
+## Type Annotations
+
+이제 Typescript 에서 어떻게 정적 타이핑을 지원하는지 알아봅시다. `hello.ts` 를 다음과 같이 수정해주세요.
+
+```ts
+// name 파라미터가 string 타입이여야 한다고 명시해줍니다
+function Hello(name: string) {
+  console.log('hello!' + name)
+}
+// string 이 아닌 다른 타입을 제공하면 error 가 발생합니다
+Hello(123) // Argument of type '123' is not assignable to parameter of type 'string'.ts(2345)
+```
+
+컴파일해보면 `Argument of type '123' is not assignable to parameter of type 'string'.ts(2345)` 란 에러가 발생합니다. `string` 타입이여야한 `name` 파라미터에 `number` 타입을 전달했기 때문이죠. 이렇게 Typescript 는 컴파일 타임에서 type check 를 해줌으로써 디버깅을 더 수월하게 도와줍니다.
+물론 에러가 발생하더라도 컴파일하면 Javscript 파일이 생성되기는 합니다. 단지 예상한 것과 다르게 작동할 수 있다고 알려주는 것이죠.
+
+## Interfaces
+
+Typescript 는 객체지향 프로그래밍에서 사용되는 인터페이스(interface)를 적용할 수 있습니다. `hello.ts` 를 다음과 같이 수정해주세요.
+
+```ts
+// Person 이라는 객체 타입을 interface 로 정의해줍니다
+interface Person {
+  name: string
+  age: number
+}
+// 파라미터로 Person 타입의 객체를 받아야 한다고 명시해줍니다
+function Hello(person: Person) {
+  console.log(`${person.name} is ${person.age} years old.`)
+}
+Hello({ name: 'Eunsu Kim', age: 23 })
+```
+
+새롭게 `Person` 이라는 interface 를 정의하였고, `Hello` 함수가 이 interface 를 구현한 객체만을 파라미터로 받도록 annotate 해주었습니다. `Hello` 함수로 전달한 객체는 `Person` interface 에서 정의한 property 를 모두 보유하고, 각 property 의 타입 또한 동일하기 때문에 컴파일이 성공적으로 이뤄집니다.
+
+주목할만한 점은 `hello.ts` 를 컴파일한 `hello.js` 를 보면, interface 를 정의한 코드는 보이지 않습니다. interface 는 Typescript 에서만 지원하는 예약어(keyword) 이기 때문이죠. 컴파일 단계에서 문제가 없다면 interface 는 코드상에서 지워지게 됩니다.
+
+## Classes
+
+ES6 에서는 `public`, `private`, `protected` 와 같은 접근지정자(access specifiers)는 사용할 수 없습니다. 비록 ES2019 에서 hash prefix(`#`)를 사용함으로써 `private` 접근지정자를 활용할 수 있긴 하지만, `#` 를 사용한 문법은 기괴하며 여전히 `protected` 와 같은 접근지정자를 지원하지 않습니다. 그러나 Typescript 는 이같은 접근지정자를 모두 지원합니다.
+
+마지막으로 클래스를 사용하여 예제 코드를 확장해보겠습니다. `hello.ts` 를 다음과 같이 수정해주세요.
+
+```ts
+// 3 가지 private 속성 name, age, position 을 갖는 Developer 클래스를 정의합니다.
+// 그리고 이 정보를 모두 반환해주는 public 함수 getInfo() 를 내부에 정의합니다.
+class Developer implements Person {
+  name: string
+  age: number
+  private position: string
+
+  constructor(name: string, age: number, position: string) {
+    this.name = name
+    this.age = age
+    this.position = position
+  }
+  public getInfo() {
+    return { name: this.name, age: this.age, position: this.position }
+  }
+}
+interface Person {
+  name: string
+  age: number
+}
+function Hello(person: Person) {
+  console.log(`${person.name} is ${person.age} years old.`)
+}
+// 클래스 instance 를 생성할 땐 new 키워드로 생성할 수 있습니다.
+const eunsu = new Developer('Eunsu Kim', 23, 'Frontend')
+Hello(eunsu.getInfo())
+```
+
+`Person` 인터페이스를 구현하는 `Developer` 클래스를 새롭게 정의하였습니다. `private` 속성인 `position` 을 추가하였고, `getInfo` 로 모든 정보를 반환해주도록 하였습니다. `eunsu` 라는 변수는 `Developer` 클래스의 instance 로, Person interface 를 implement 하였기 때문에 `Hello` 함수의 파라미터로 잘 전달이 됩니다.
+
+# Recap
+
+객체지향 프로그래밍에 익숙한 분들은 Typescript 를 사용할 때 친숙한 느낌이 들 것입니다. 또 함수형 프로그래밍에 익숙하여 순수 합수를 작성하는 것을 좋아하는 분들도 Typescript 의 type annotation 의 도움으로 훨씬 더 나은 코드 작성 경험을 느끼실 수 있을 것입니다. 혹시 아직 Typescript 를 사용하지 않고 계시다면, 이번 기회에 한번 사용해 보는 것을 추천드립니다👍.
+
+# References
+
+- [Typescript Official Document](https://www.typescriptlang.org/docs/home.html)
+- [Typescript Introduction](https://poiemaweb.com/typescript-introduction)
+- [Typescript 핸드북](https://typescript-kr.github.io/)

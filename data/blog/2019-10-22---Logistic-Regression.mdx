@@ -1,0 +1,237 @@
+---
+title: Logistic Regression(로지스틱 회귀) 개념 정리
+summary: Machine Learning 알고리즘 중 대표적인 classification 알고리즘인 Logistic Regression에 대해서 알아봅시다
+date: '2019-10-22T02:00:00.000Z'
+draft: false
+slug: 'understanding-logistic-regression'
+category: Machine Learning
+tags:
+  - TIL
+  - Machine Learning
+  - Python
+---
+
+우리가 이메일 서비스를 사용할 때, 수신한 이메일이 스팸일지 아닐지를 어떻게 결정할 수 있을까요? 한 가지 방법은 _Logistic Regression_ 을 활용하는 것입니다.
+
+**Logistic Regression은 데이터가 특정 카테고리에 속할지를 0과 1사이의 연속적인 확률로 예측하는 회귀 알고리즘 중 하나입니다**. 그런 다음, 확률에 기반하여 특정 데이터가 어떤 카테고리에 속할지를 결정하게 되고, 궁극적으로 classification문제를 풀게 됩니다.
+
+Logistic Regression을 활용하면 수신한 이메일이 스팸일지 아닐지를 예측할 수 있습니다. 만약 특정 이메일의 예측된 확률값이 `0.5` 보다 크다면 해당 이메일을 `spam` 으로 분류합니다. 여기서 `spam` 은 _positive class_ 라고 불리고, label을 `1` 로 설정합니다. _positive class_ 란 모델이 detect하고자 하는 class를 말합니다. 만약 특정 이메일의 예측된 확률값이 `0.5` 보다 작다면, 해당 이메일을 `ham` 으로 분류합니다. 여기서 `ham` 은 _negative class_ 라고 불리고, lable을 `0` 으로 설정합니다. 이렇게 두 가지 class중 데이터가 어떤 class에 속할지 결정하는 일을 _binary classification_ 이라고 합니다.
+
+# Linear Regression Approach
+
+만약 대학교 강의에서 학생들이 기말 시험을 pass할 수 있을지를 예측한다고 생각해봅시다. 첫 번째로 해야할 일은 각 학생들이 시험을 pass할 확률을 예측하는 것입니다. 여기서 **Linear Regression**을 활용하면 어떨까요? 한번 해봅시다.
+
+각 학생들이 공부한 시간 `num_hours_studied` 과 해당 학생이 중간 시험을 통과한 여부 `y` 데이터가 존재할 때, `y` 는 통과한 경우 `1`, 그렇지 않은 경우 `0` 이라고 한다면 Linear Regression을 통해 다음과 같이 직선을 그릴 수 있습니다.
+
+<img
+  width="640"
+  src="https://s3.amazonaws.com/codecademy-content/programs/data-science-path/logistic-regression/linear_regression.png"
+/>
+
+여기에는 한 가지 문제가 존재합니다. 바로 낮은 `num_hours_studied` 값을 보유한 학생에 대해서는 확률이 음의 값으로 예측된다는 것입니다. 마찬가지로 높은 값을 보유한 학생의 예측값은 `1` 을 초과하게 됩니다. 이렇게 기준을 벗어나는 확률 값은 의미가 없습니다. 이러한 문제가 발생하는 이유는 바로 Linear Regression의 출력 범위가 -∞ 부터 +∞ 까지기 떄문입니다.
+
+# Logistic Regression
+
+Logistic Regression의 출력은 0과 1 사이기 때문에 위와 같은 Linear Regression의 한계를 극복할 수 있습니다. Logistic Regression은 다음과 같은 과정으로 수행됩니다.
+
+1. 모든 coefficients와 intercept를 `0` 으로 초기화합니다.
+2. 각각의 feature를 이에 상응하는 coefficient와 곱한 값과 intercept를 모두 더해 *log-odds*를 계산합니다.
+3. 계산한 log-odds 값을 _sigmoid_ 함수에 전달하여 `0` 과 `1` 사이의 확률값을 구합니다.
+4. 계산한 확률값과 실제 label을 비교하여 *Loss*를 계산하고, *gradient descent*로 최적화된 coefficients와 intercept를 계산합니다.
+5. 최적화된 파라미터를 구했다면 _classification threshold_ 값을 조절하여 positive class와 negative class를 어떻게 나눌지를 설정합니다.
+
+위 방법대로 Logistic Regression을 구현해봅시다.
+
+# Log-Odds
+
+Linear Regression에서는 각 feature를 이에 상응하는 coefficient와 곱한 값과 intercept를 모두 더해 predict를 하였습니다. Logistic Regression에서도 마찬가지지만 **log-odds**를 계산합니다.
+
+log-odds는 특정 데이터가 positive class에 속할 확률을 표현하는 또 다른 방법입니다. 확률론에서 특정 사건의 _odds_(승산)을 계산하는 공식은 다음과 같습니다.
+
+$$Odds = \cfrac{P(특정~사건이~발생하는~경우)}{P(특정~사건이~발생하지~않는~경우)} = \cfrac{P(A)}{1 - P(A)}$$
+
+Odds는 특정 사건이 일어나는 횟수가 특정 사긴이 일어나지 않는 횟수보다 얼마나 더 많은지를 의미합니다. 만약 특정 학생이 시험에서 pass할 확률이 0.7이라면, pass하지 못 할 확률은 `1 - 0.7 = 0.3` 이고, 이 경우 odds를 다음과 같이 계산할 수 있습니다.
+
+$$Odds~of~passing = \cfrac{0.7}{0.3} = 2.33$$
+
+Odd는 0과 양의 무한대의 값을 범위로 갖습니다. 이는 log함수의 도메인과 일치하는데요. log-odds는 odds에 log를 취한 것입니다. 이때 log의 밑은 e입니다. 이로써 odds를 음의 무한대부터 양의 무한대까지의 범위를 갖는 log-odds를 계산할 수 있습니다.
+
+$$Log~odds~of~passing = log(2.33) = 0.847$$
+
+Logistic Regression 모델에서, 우리는 아래와 같이 `z` 값으로 나타내지는 log-odds 값을 계산할 수 있습니다.
+
+$$log(\cfrac{P(A)}{1 - P(A)}) = z = b_0 + b_1x_1 + b_2x_2 + \cdots + b_nx_n$$
+
+이로써 특정 데이터의 feature values를 해당 데이터가 positive class에 속할 가능성으로 매핑할 수 있습니다. 이 때 이러한 곱의 합을 _dot product_(내적) 이라고 합니다. 내적은 `numpy` 의 `np.dot()` 메서드를 활용하여 쉽게 계산할 수 있습니다.
+
+```python
+log_odds = np.dot(features, coefficients) + intercept
+```
+
+feature의 shape은 (데이터 수, 피처 수) 이고, coefficients의 shape은 (피처 수, 1)입니다. intercept는 상수항으로 모든 array element에 대해 broadcasting됩니다.
+
+## Python code
+
+위의 log-odds를 계산하는 함수 `log_odds()` 를 Pyhon 코드로 구현해보면 다음과 같습니다.
+
+```python
+def log_odds(features, coefficients, intercept):
+  z = np.dot(features, coefficietns) + intercept
+  return z
+```
+
+# Sigmoid Function
+
+Sigmoid Function은 Logistic Regression의 핵심이자 이름이 이와 같이 지어지게된 원천으로, log-odds인 `z` 값을 취해서 `0` 과 `1` 사이의 값을 반환합니다.
+
+$$a = σ(z) = \cfrac{1}{1 + e^{-z}}$$
+
+<img
+  width="500"
+  src="https://s3.amazonaws.com/codecademy-content/programs/data-science-path/logistic-regression/sigmoid.png"
+/>
+
+이는 궁극적으로 Logistic Regression이 특정 데이터가 positive class에 속할 확률을 계산하게 합니다.
+
+## Python code
+
+Sigmoid function과 동일하게 작동하는 함수 `sigmoid()` 를 Python 코드로 구현해보면 다음과 같습니다. $e^{-z}$ 는 exponential function으로 `numpy` 의 `np.exp(-z)` 로 구현할 수 있습니다.
+
+```python
+def sigmoid(z):
+  return 1 / (1 + np.exp(-z))
+```
+
+# Log-Loss
+
+지금까지 Logistic Regression 모델이 어떻게 확률을 예측하는지 알아보았습니다. 그렇다면 이제 남은 것은 최적화된 coefficients와 intercept를 구하는 일입니다. 그런데 어떻게 이를 구할 수 있을까요? 이에 대답하기 위해선 주어진 모델이 데이터에 얼마나 fit 한지를 측정하는 기준이 필요합니다. 이를 ML에서는 _loss function_ 혹은 _cost function_ 이라고 합니다.
+
+모델이 데이터에 'fit' 하단걸 측정하기 위해선 먼저 각 데이터에 대한 loss를 계산한뒤 loss의 평균을 내야합니다. Logistic Regression에서의 loss function은 **Log Loss**라고 불리며, 공식은 다음과 같습니다.
+
+$$J(b) = -\cfrac{1}{m} \displaystyle\sum_{i=1}^{m} [y^{(i)}log(a^{(i)}) + (1 - y^{(i)})log(1 - a^{(i)})]$$
+
+- `m` 은 전체 데이터의 개수입니다
+- $y^{(i)}$ 는 `i` 번째 데이터의 class 입니다
+- $a^{(i)}$ 는 `i` 번째 데이터의 log-odds 값에 sigmoid 를 취한 값입니다. 즉 `i` 번째 데이터가 positive class에 속할 확률을 나타낸 값입니다
+
+왜 위와 같은 공식이 유도되는 걸까요? 논리적으로 생각해 봅시다. 만약 `i` 번째 데이터의 class가 `y=1` 이라면 해당 데이터에 대한 loss는 다음과 같습니다.
+
+$$loss_{i(y=1)} = -log(a^{(i)})$$
+
+loss를 최소화 시키려면 $a^{(i)}$ 값이 커야 합니다. 즉, 예측된 확률 값이 원래 class인 `1` 에 가까울수록 loss는 줄어들게 됩니다. 이번에는 반대로 `i` 번째 데이터의 class가 `y=0` 인 경우를 생각해봅시다.
+
+$$loss_{i(y=0)} = -log(1 - a^{(i)})$$
+
+loss를 최소화 시키려면 $a^{(i)}$ 값이 작아야 합니다. 즉, 예측된 확률 값이 원래 class이 `0`에 가까울수록 loss는 줄어들게 됩니다. 아래의 그래프는 class가 `y=1` , `y=0` 일 때 a값에 따라 loss가 어떻게 변화하는지를 나타냅니다.
+
+<img
+  width="600"
+  src="https://s3.amazonaws.com/codecademy-content/programs/data-science-path/logistic-regression/loss-function-graph.png"
+/>
+
+그래프를 보면 올바르게 예측할수록 loss가 줄어드는 것을 볼 수 있습니다. 반대로 잘 못 예측하게 되면 loss가 크게 증가하는데, 이는 모델이 잘 못 예측할 때 패널티를 강하게 줌으로써 올바른 예측을 할 수 있도록 유도할 수 있습니다.
+
+이제는 Linear Regression과 마찬가지로 *gradient descent*를 활용해서 loss를 최소화시키는 coefficients와 intercept를 찾으면 됩니다. 여기서는 따로 다루지 않겠습니다.
+
+## Python code
+
+Log loss를 계산하는 함수 `log_loss()`를 Python 코드로 구현해보면 다음과 같습니다.
+
+```python
+# probabilities는 log-odds에 sigmoid를 취한 확률값 입니다
+# actual_class는 실제 class label 입니다
+def log_loss(probabilities, actual_class):
+  return np.sum(-(1/actual_class.shape[0]) * (actual_class * np.log(probabilities) + (1 - actual_class) * np.log(1 - probabilities)))
+```
+
+# Classification Thresholding
+
+Logistic Regression은 예측된 확률 값이 임계값을 넘느냐 못 넘느냐에 따라서 class를 분류합니다. 이 임계값을 **_classification threshold_** 라고 합니다.
+
+Classification threshold의 디폴트 값은 `0.5` 입니다. 만약 특정 데이터의 예측된 확률 값이 `0.5` 보다 크거나 같다면 해당 데이터는 positive class로 분류됩니다. 반대로 예측된 확률 값이 `0.5` 보다 낮다면 negative class로 분류됩니다.
+
+<img
+  width="760"
+  src="https://s3.amazonaws.com/codecademy-content/programs/data-science-path/logistic-regression/Threshold-01.svg"
+/>
+
+위 그림은 피부암을 진단하는 모델의 데이터 분포와 classification threshold를 나타내고 있습니다. 노란색으로 색칠된 부분은 암 환자임에도 불구하고 정상으로 판단할 오류를 나타내는 영역입니다. 만약 더 많은 암 환자들을 찾아내고자 한다면 threshold를 `0.3` 이나 `0.4` 로 조정할 수 있습니다. 즉, 모델이 positive class를 더 많이 예측할 수 있도록 하는 것입니다. 물론 정상 사람들을 암환자라고 판단할 오류는 더 커지겠지만, 놓치고 있던 암환자를 찾아냄으로써 얻는 가치는 이를 감수할 수 있을 것입니다.
+
+<img
+  width="760"
+  src="https://s3.amazonaws.com/codecademy-content/programs/data-science-path/logistic-regression/Threshold-02.svg"
+/>
+
+## Python code
+
+예측된 확률값이 임계값을 넘으면 `1`, 그렇지 않으면 `0` 을 반환하는 함수 `predict_class()` 를 Python 코드로 구현해보면 다음과 같습니다.
+
+```python
+def predict_class(features, coefficients, intercept, threshold):
+  z = log_odds(features, coefficients, intercept)
+  a = sigmoid(z)
+
+  return np.where(a >= threshold, 1, 0)
+```
+
+# Scikit-Learn
+
+지금까지 Logistic Regression이 어떤 과정으로 이뤄지는지 알아보았습니다. 이제 `sklearn` 에서 제공하는 메서드를 활용하여 Logistic Regression을 구현해봅시다.
+
+먼저 `sklearn` 의 `linear_model` 모듈에서 `LogisticRegression` 을 임포트한 뒤, `LogisticRegression` 객체를 생성해 줍니다.
+
+```python
+model = LogisticRegression()
+```
+
+그런 다음, `.fit()` 함수에 features와 labels을 파라미터로 전달하여 모델을 학습시킵니다. `.fit()` 함수는 내부적으로 gradient descent를 수행해서 최적의 coefficients와 intercept를 찾아줍니다.
+
+```python
+model.fit(features, labels)
+```
+
+마지막으로 `.predict()` 함수로 테스트할 데이터를 전달하여 `1` 과 `0` 으로 예측된 결과를 확인할 수 있습니다. 이 때 `sklearn` 은 디폴트로 classification threshold를 `0.5` 로 설정합니다.
+
+```python
+model.predict(features)
+```
+
+만약 데이터의 class가 아닌 예측된 확률을 얻고자 한다면 `.predict_proba()` 함수에 동일한 파라미터를 전달하면 됩니다. 이 함수는 `0` 과 `1` 사이의 예측된 확률값을 반환합니다.
+
+```python
+model.predict_proba(features)
+```
+
+**Note**: `sklearn` 의 Logistic Regression을 활용하려면 반드시 데이터를 정규화 할 필요가 있습니다. `sklearn` 의 Logistic Regression은 내부적으로 Regularization을 수행하기 때문입니다. Regularization은 오버피팅을 방지하기 위함인데, 이번 포스팅에서는 다루지 않도록 하겠습니다.
+
+자, 이제 scikit-learn을 활용하여 Logistic Regression을 구현해 봅시다.
+
+```python
+import numpy as np
+from sklearn.linear_model import LogisticRegression
+from exam import hours_studied_scaled, passed_exam, guessed_hours_scaled
+
+# LogisticRegression 모델 객체를 생성합니다
+model = LogisticRegression()
+# 학생들의 공부 시간을 feature로 활용하고, 각 학생들의 중간 시험 통과 여부를 label로 활용합니다
+model.fit(hours_studied_scaled, passed_exam)
+# 다음 시험에서 학생들이 통과할 확률을 예측합니다
+passed_predictions = model.predict_proba(guessed_hours_scaled)
+```
+
+# Review
+
+지금까지 Logistic Regression이 어떻게 작동하고 이를 Python으로 구현하는 방법에 대해서 알아보았습니다. 이번 포스팅에서 배운 내용을 정리하면 다음과 같습니다.
+
+- Logistic Regression is used to perform binary classification, predicting whether a data sample belongs to a positive (present) class, labeled `1` and the negative (absent) class, labeled `0`.
+- The Sigmoid Function bounds the product of feature values and their coefficients, known as the log-odds, to the range `[0,1]`, providing the probability of a sample belonging to the positive class.
+- A loss function measures how well a machine learning model makes predictions. The loss function of Logistic Regression is log-loss.
+- A Classification Threshold is used to determine the probabilistic cutoff for where a data sample is classified as belonging to a positive or negative class. The standard cutoff for Logistic Regression is `0.5`, but the threshold can be higher or lower depending on the nature of the data and the situation.
+- Scikit-learn has a Logistic Regression implementation that allows you to fit a model to your data, find the feature coefficients, and make predictions on new data samples.
+- The coefficients determined by a Logistic Regression model can be used to interpret the relative importance of each feature in predicting the class of a data sample.
+
+`sklearn` 에서는 Logistic Regression을 적용해 볼 수 있는 여러 dataset을 제공하고 있습니다. 한 번 직접 Logistic Regression으로 어떤 coefficient가 모델에 제일 영향을 많이 미치는지 확인해 보는 것도 재밌을 듯 합니다😃
+
+# References
+
+- [Codecademy](http://www.codecademy.com)

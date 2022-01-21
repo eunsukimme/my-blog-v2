@@ -1,0 +1,86 @@
+---
+title: Variance(분산) 그리고 Standard Deviation(표준편차) 개념 정리
+summary: 데이터가 흩어진 정도를 나타내는 지표인 분산과 표준편차에 대해서 알아봅시다
+date: '2019-10-27T23:00:00.000Z'
+draft: false
+slug: 'understanding-variance-and-standard-deviation'
+category: Data Science
+tags:
+  - TIL
+  - Python
+  - Data Science
+  - Numpy
+---
+
+평균과 중간값은 데이터를 이해할 수 있는 좋은 지표입니다. 이번 포스팅에서는 데이터가 어떻게 분포되어있는지를 나타내는 분산과 표준편차에 대해서 알아봅시다.
+
+# Variance
+
+다음과 같은 데이터가 있다고 생각해 봅시다.
+
+```python
+dataset_one = [-4, -2, 0, 2, 4]
+dataset_two = [-400, -200, 0, 200, 400]
+```
+
+두 데이터셋의 평균과 중간값은 모두 `0` 입니다. 평균과 중간값만 봤을 때 두 데이터셋은 별반 다르지 않을 것이라 예상할 수 있지만 실제로는 그렇지 않죠. 이 때 _variance(분산)_ 이 유용하게 사용됩니다. 분산은 데이터가 얼마나 흩어져 있는가를 나타내는 지표입니다.
+
+분산을 구하기 위해선 먼저 difference(편차)를 계산해야 합니다. 편차는 각 데이터 포인트와 평균의 차이를 말합니다.
+
+$$difference_i = X_i - µ $$
+
+만약 `X = [1, 3, 6, 10]` 일 때 평균 `µ` 은 `5` 이고, 편차는 다음과 같이 나타납니다.
+
+<img
+  width="500"
+  src="https://s3.amazonaws.com/codecademy-content/courses/statistics/variance/difference.svg"
+/>
+
+즉 위 예에서 편차는 `[-4, -2, 1, 5]` 가 됩니다. 각 편차는 데이터 포인트가 평균으로부터 얼마나 멀리 떨어져 있는가를 나타냅니다. 이 편차들을 대표하는 값을 결정하면 데이터가 분산된 정도를 나타내는 하나의 값을 얻을 수 있습니다. 이를 위해 편차들의 평균을 계산합시다.
+
+그런데 편차의 평균을 계산하기 전에 반드시 각 편차를 **제곱** 해주어야 합니다. 편차의 합은 음수와 양수가 서로 상쇄됨으로써 항상 `0` 이 되기 때문입니다. 그리하여 분산($σ^2$)을 구하는 최종 수식은 다음과 같습니다. 이 때 N은 총 데이터의 수를, `i` 는 데이터의 `i` 번째를 의미합니다.
+
+$$σ^2 = \cfrac{1}{N} \displaystyle\sum_{i=1}^N (X_i - µ)^2$$
+
+Python에서는 Numpy라이브러리를 통해 다음과 같이 쉽게 분산을 계산할 수 있습니다.
+
+```python
+import numpy as np
+
+dataset = [3, 5, -2, 49, 10]
+variance = np.var(dataset)
+```
+
+# Standard Deviation
+
+분산은 그 단위가 평균이나 데이터 자체와 다르기 때문에 이를 활용하여 흩어진 정도를 설명하기는 쉽지 않습니다. 분산은 편차를 제곱한 값이기 때문에 _units squared_(제곱된 단위)로 측정이 되기 때문입니다. 만약 NBA 선수 데이터셋에서 평균 키가 `77.98(inches)` 이고, 분산이 `13.32(inches squared)`라면 이를 어떻게 설명할 수 있을까요?
+
+단위가 달라서 데이터를 설명하기 힘들어지는 점을 극복하기위해 사용하는 것이 바로 _standard deviation(표준편차)_ 입니다. 표준편차는 분산에 루트($\sqrt{}$)를 취함으로써 구할 수 있습니다.
+
+$$σ = \sqrt{σ^2} = \sqrt{ \cfrac{1}{N}\displaystyle\sum_{i=1}^N (X_i - µ)^2 }$$
+
+Python에서는 Numpy라이브러리를 통해 다음고 같이 쉽게 표준편차를 계산할 수 있습니다.
+
+```python
+import numpy as np
+
+dataset = [4, 8, 15, 16, 23, 42]
+standard_deviation = np.std()
+```
+
+표준편차를 계산함으로써 이제 데이터가 분산된 정도를 데이터셋과 동일한 단위로 나타낼 수 있게 되었습니다. 즉 데이터 포인트가 평균에서 벗어난 정도를 표준편차로 나타냄으로써 특정 데이터가 얼마나 unusual한지를 알 수 있게 되었습니다.
+
+<img
+  width="600"
+  src="https://s3.amazonaws.com/codecademy-content/courses/statistics/variance/normal_curve.svg"
+/>
+
+통계적으로 전체 데이터 중 68%가 `+/-σ` 사이에 위치하고, 95%가 `+/-2σ` 사이에 위치하며, 99.7%가 `+/-3σ` 사이에 위치합니다.
+
+# Review
+
+이번 포스팅에서는 데이터가 흩어진 정도를 나타내는 분산과 표준편차에 대해서 알아보았습니다. 자주 까먹게 되는 내용이라 이번에 간단히 정리하고 넘어갔습니다 :)
+
+# References
+
+- [Codecademy](http://www.codecademy.com)

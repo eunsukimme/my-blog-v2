@@ -1,0 +1,269 @@
+---
+title: Docker, AWS CodeBuild, CodeDeploy 그리고 CodePipeline 으로 Node.js 프로젝트 CI/CD 구축하기
+summary: Docker 와 AWS CodeBuild, CodeDeploy, CodePipeline 을 활용해 Node.js 프로젝트의 CI/CD 파이프라인을 구축하는 방법에 대해서 알아봅시다.
+date: '2020-08-25T02:30:00.000Z'
+draft: false
+slug: 'nodejs-cicd-pipeline-with-aws-codebuild-codedeploy-codepipeline'
+category: DevOps
+tags:
+  - DevOps
+  - Nodejs
+  - AWS
+  - Cloud
+  - IAM
+  - Docker
+  - CodeBuild
+  - CodeDeploy
+  - CodePipeline
+socialImage: '/media/node_codebuild_codedeploy_codepipeline/AWS_CICD.png'
+---
+
+이번 포스팅에서는 Docker 와 AWS 서비스를 활용하여 EC2 에 Node.js 앱을 배포하는 방법을 설명하도록 하겠습니다. 전체적인 CI/CD 아키텍처를 그림으로 표현하면 다음과 같습니다.
+
+![/media/node_codebuild_codedeploy_codepipeline/AWS_CICD.png](/media/node_codebuild_codedeploy_codepipeline/AWS_CICD.png)
+
+전체적인 흐름을 설명하면, 개발자가 Github 에 코드를 푸쉬하면 CodePipeline 이 이를 감지하고, CodeBuild 를 실행시켜 도커 이미지를 생성합니다. 생성된 도커 이미지는 Docker hub 에 올라가고, 배포에 필요한 파일들을 S3 에 저장됩니다. 그런 다음 CodeDeploy 가 EC2 상의 Agent 를 실행시켜 S3에 저장된 파일들을 가져오도록 하고, Docker hub 에 올라간 이미지를 내려받아 컨테이너를 실행시킵니다.
+
+이번 포스팅에서는 이러한 파이프라인에 사용되는 CodeBuild, CodeDeploy, CodePipeline 을 직접 설정하는 과정에 대해서 정리해 보도록 하겠습니다.
+
+## Prerequisite
+
+먼저 Docker Hub, Github 계정과 Docker Hub 에 배포할 이미지 레포지토리와 Github 레포지토리가 생성되있어야 합니다. 또한 배포할 EC2 가 이미 만들어져 있으며 Docker 가 설치되어 있어야 합니다.
+
+**Note**: CodeDeploy Agent 도 EC2 에 설치되어야 하는데, 이번 포스팅에서는 CodeDeploy Agent 설치에 필요한 SSM Agent 가 이미 설치되어 있는 Ubuntu 18.04 를 EC2 OS로 사용하여 설치 작업을 넘어가도록 하겠습니다.
+
+## 1. Project Setting
+
+CodeBuild 가 수행할 작업을 명시하는 buildspec 파일과 CodeDeploy 가 수행할 작업을 명시하는 appspec 파일 및 필요한 스크립트로 아래 코드를 사용하겠습니다.
+
+`gist:eunsukimme/6d603d80465566e89b519c42e23cf08a#appspec.yml`
+
+`appspec.yml` 은 CodeDeploy Agent 가 수행할 작업과 환경을 설정하는 파일입니다. `files` 에서 `source` 는 CodeBuild 로 부터 전달받은 `artifacts` 의 파일 시스템 중 가져오고자 하는 파일들이고, `destination` 은 배포하고자 하는 호스트(EC2) 의 파일 시스템에서 `source` 로부터 가져온 `artifacts` 가 위치할 디렉터리를 말합니다.
+
+`appspec.yml` 에서 `hooks` 는 CodeBuild 의 `phases` 와 유사한데, CodeDeploy 에서의 작업 단계를 나타냅니다. 각 작업 단계에 대한 자세한 설명은 [공식 document](https://docs.aws.amazon.com/ko_kr/codedeploy/latest/userguide/reference-appspec-file-structure-hooks.html) 를 참고하세요. 여기서는 `AfterInstall`, `ApplicationStart`, `ApplicationStop` 세 단계를 정의하였습니다.
+
+`gist:eunsukimme/6d603d80465566e89b519c42e23cf08a#buildspec.dev.yml`
+
+`buildspec.dev.yml` 은 CodeBuild 가 소스코드를 빌드할 때 수행할 작업과 환경을 설정하는 파일입니다. `phases` 는 CodeBuild 에서 작업 단계를 나타내는 특수한 단계들로, 여기서는 `pre_build`, `build`, `post_build` 세 단계를 정의하였습니다. 그리고 `artifacts` 는 CodeBuild 가 작업을 마친 뒤 CodeDeploy 에게 전달할 파일들을 명시하는 부분으로, 여기서는 `appspec.yml` 과 docker 커맨드가 포함된 `scripts/*` , 그리고 `docker-compose.dev.yml` 파일을 전달하고 있습니다.
+
+`gist:eunsukimme/6d603d80465566e89b519c42e23cf08a#Dockerfile.dev`
+
+`Dockerfile.dev` 는 전형적인 Node.js(Typescript) 앱의 Dockerfile 입니다. 도커파일을 보면 두 단계로 나눠서 빌드를 진행하는데, 첫 단계(`builder`)엔 소스코드를 복사해서 빌드를 진행하고, 두 번째 단계(`runtime`)에선 빌드된 파일과 노드 모듈만을 가져온 뒤 커맨드를 실행하고 있습니다.
+
+`gist:eunsukimme/6d603d80465566e89b519c42e23cf08a#docker-compose.dev.yml`
+
+`docker-compose.dev.yml` 도 역시 평범한 도커 컴포즈 파일입니다. `app` 이란 서비스 이름으로 컨테이너를 생성할 것을 명시하고 있습니다.
+
+`gist:eunsukimme/6d603d80465566e89b519c42e23cf08a#pullDocker.sh`
+
+`pullDocker.sh` 는 CodeDeploy 가 EC2 상에서 실행할 쉘 스크립트 입니다. Docker Hub 에 로그인을 하고 필요한 이미지를 가져옵니다. 여기서 `DEPLOYMENT_GROUP_NAME` 는 CodeDeploy 만의 환경변수로, deploy group 을 지칭합니다. deploy group 에 대해선 조금 뒤에 CodeDeploy 를 설정할 때 다시 얘기하겠습니다.
+
+`gist:eunsukimme/6d603d80465566e89b519c42e23cf08a#runDocker.sh`
+
+`runDocker.sh` 는 CodeDeploy 가 EC2 상에서 가져온 이미지를 컨테이너로 띄우는 쉘 스크립트입니다.
+
+`gist:eunsukimme/6d603d80465566e89b519c42e23cf08a#stopDocker.sh`
+
+마지막으로 `stopDocker.sh` 는 모든 컨테이너를 stop 시키는 명령으로, CodeDeploy 가 배포할 때 제일 처음 실행하는 쉘 스크립트 입니다.
+
+---
+
+## 2. Create IAM Roles
+
+CodeBuild, CodeDeploy 를 설정하기 전 먼저 해당 서비스에 필요한 Role 을 만들어 주도록 하겠습니다. IAM 서비스 화면에서 `Create Role` 버튼을 눌러주세요.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.01.43_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.01.43_PM.png)
+
+### Role for CodeBuild
+
+제일 먼저 CodeBuild 에 필요한 Role 을 생성해줍시다. 서비스 목록 중 `CodeBuild` 를 선택하고 `Next` 버튼을 눌러주세요.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.02.56_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.02.56_PM.png)
+
+CodeBuild 는 빌드가 완료된 뒤 만들어진 artifacts 를 S3 에 올리기 때문에 S3 에 접근할 수 있는 권한을 가져야 합니다. 여기서는 `AmazonS3FullAccess` 를 주도록 하겠습니다.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.03.29_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.03.29_PM.png)
+
+마지막으로 Role 이름을 설정한 뒤 `Create Role` 버튼을 눌러서 생성해주면 됩니다.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.04.31_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.04.31_PM.png)
+
+### Role for CodeDeploy
+
+다음으로 CodeDeploy 에 필요한 Role 을 생성해줍시다. 이 때 서비스로 `CodeDeploy` 를 선택한 뒤 유스케이스로 `CodeDeploy` 를 선택해주면 됩니다.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.15.54_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.15.54_PM.png)
+
+CodeDeploy 의 경우 기본적으로 `AWSCodeDeployRole` 이 부여됩니다. 다른 설정은 모두 건너 뛰고 Role 이름을 설정한 뒤 `Create Role` 버튼을 눌러서 생성을 완료해줍시다.(아래 사진에서 Permission boundary 가 설정되어 있는데, 잘못 설정한 것이니 무시하시면 됩니다.)
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.20.22_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.20.22_PM.png)
+
+CodeDeploy 의 경우 CodeBuild 에서 생성된 artifacts 를 가져와야 하기 때문에 S3에 접근할 수 있어야 합니다. 마찬가지로 permission policy 로 `AamazonS3FullAccess` 를 부여해줍시다.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.26.04_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.26.04_PM.png)
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.34.42_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.34.42_PM.png)
+
+---
+
+## 3. Create CodeBuild Project
+
+자, 이제 본격적으로 CodeBuild 프로젝트를 생성해보겠습니다.
+
+### Project Configuration
+
+CodeBuild 서비스 화면에서 `Create build project` 버튼을 눌러주세요.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_6.56.38_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_6.56.38_PM.png)
+
+제일 먼저 빌드 프로젝트의 이름을 설정해줍시다. 여기서는 `codepipeline-test` 라고 주었습니다.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_6.57.45_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_6.57.45_PM.png)
+
+### Source
+
+다음으로 어디서 코드를 가져올 것인지를 명시해줄 수 있습니다. `Source provider` 를 `Github` 으로 설정하고, 개인 계정에서 해당 레포지토리를 선택해줍시다. `Source version` 에서 브랜치 이름을 주면 해당 브랜치의 소스코드를 가져올 수 있습니다.
+
+**Note**: 이때 주의해야 할 것은 `Primary soource webhook events` 웹훅 체크박스는 해제해야 합니다. 왜냐하면 나중에 CodePipeline 을 설정해줄 때 웹훅을 적용하기 때문에 여기서 적용하면 푸시할 때 빌드가 두 번 돌아가게 됩니다.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_6.58.27_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_6.58.27_PM.png)
+
+### Environment
+
+다음으로 프로비저닝할 때 사용되는 환경을 설정할 수 있습니다. 여기서 OS 는 `Amazon Linux 2` 로 설정했습니다. 그 아래 런타임과 이미지 등은 사진에 나와있는 것과 동일하게 설정해주면 됩니다.
+
+이때 맨 아래에 `Privileged` 섹션에서 체크박스를 체크해 주어야 합니다. 왜냐하면 Docker 를 사용해서 빌드를 하고, 빌드된 이미지를 Docker hub 에 올려야 하기 때문에 Docker 가 설치된 이미지를 사용해야 하기 때문입니다.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.05.09_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.05.09_PM.png)
+
+그런 다음 `Service role` 로 조금 전에 만들어준 CodeBuild role 을 제공하면 됩니다.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.07.47_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.07.47_PM.png)
+
+### Buildspec
+
+마지막으로 CodeBuild 가 참조할 파일인 buildspec 을 정의할 수 있습니다. 여기서는 `buildspec.dev.yml` 이란 이름의 파일을 참조하도록 하였습니다.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.08.30_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.08.30_PM.png)
+
+맨 아래 완료 버튼을 눌러주면 이로써 CodeBuild 설정은 끝났습니다.
+
+---
+
+## 4. Create CodeDeploy Project
+
+자, 이제 CodeBuild 다음 단계인 CodeDeploy 를 설정해주도록 합시다.
+
+### Application Configuration
+
+CodeBuild 에서는 project라는 용어로 빌드 프로젝트를 생성했는데, CodeDeploy 에서는 비슷한 개념으로 application 이란 용어를 사용합니다. CodeDeploy 서비스 화면에서 `Create application` 버튼을 눌러서 새로운 어플리케이션을 생성해 줍시다.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.09.00_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.09.00_PM.png)
+
+제일 먼저 어플리케이션 이름을 설정하고, `Compute platform` 를 `EC2/On-premises` 로 설정해 줍시다.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.09.25_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.09.25_PM.png)
+
+이렇게 하면 하나의 CodeDeploy application 이 생성됩니다. 더 자세한 설정은 아래 Deployment Group 에서 하게 됩니다.
+
+### Deployment Group
+
+Application 을 생성한 뒤 하위 개념인 deployment group 을 새로 만들어 주어야 합니다. 이렇게 application 안에 deployment group 이 존재하는 이유는 환경 별로 다른 배포 정책을 적용하기 위함 입니다.
+
+일단 `Create deployment group` 을 눌러서 새로운 그룹을 생성해 줍시다.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.09.58_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.09.58_PM.png)
+
+제일 먼저 그룹 이름을 설정할 수 있습니다. 여기선 `dev` 란 이름으로 설정하였습니다. 그런 다음 role 을 설정해야 하는데, 역시 맨 처음 생성했던 CodeDeploy role 을 제공하면 됩니다.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.21.11_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.21.11_PM.png)
+
+### Environment
+
+CodeBuild 에서는 Environment 가 빌드하기 위해 프로비저닝 할 환경을 설정하는 것이었다면, CodeDeploy 에서 Environment 는 실제로 배포할 환경, 즉 우리의 EC2 를 가리켜야 합니다.
+
+`Amazon EC2 instances` 를 선택한 뒤 `Key` 는 `Name` 으로 설정하여 EC2 의 이름으로 선택할 수 있도록 하고, `Value` 로 배포하고자 하는 EC2 의 이름을 입력해줍시다.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.21.54_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.21.54_PM.png)
+
+### Agent Configuration
+
+다음으로 CodeDeploy Agent 를 설치하는 정책을 설정할 수 있습니다. 여기서는 맨 처음 단 한번 설치하도록 `Only once` 를 선택해줍시다.
+
+### Deployment Settings
+
+`Deployment settings` 는 배포 전략을 말하는데, 한번에 모든 EC2 를 배포할 것인지 또는 하나씩 배포할 것인지 등을 설정할 수 있습니다. 여기서는 `CodeDeployDefault.AllAtOnce` 로 설정해서 모든 EC2 를 동시에 배포하도록 설정하겠습니다.
+
+### Load Balancer
+
+마지막으로 `Load balancer` 를 설정해서 배포 중 트래픽을 조절할 수 있는데, 여기서는 다루지 않겠습니다. 체크박스를 해제한 뒤 `Create deployment group` 버튼을 눌러서 생성을 완료해줍시다.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.22.37_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.22.37_PM.png)
+
+---
+
+## 5. Create CodePipeline
+
+자, 이제 CodePipeline 을 생성해서 이전에 만든 CodeBuild 와 CodeDeploy 를 이어주도록 합시다. CodePipeline 서비스 화면에서 `Create pipeline` 버튼을 눌러주세요.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.23.36_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.23.36_PM.png)
+
+### Pipeline settings
+
+제일 먼저 파이프라인의 이름을 정할 수 있습니다. 그리고 role 을 설정할 수 있는데 여기서는 새로운 role 을 만들어 주는 걸 선택해 줍시다.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_8.35.35_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_8.35.35_PM.png)
+
+### Add Source Stage
+
+다음으로 코드를 어디서 가져올 것인지를 선택해줍시다. CodeBuild 에서와 동일하게 설정해주면 됩니다. `Source provider` 를 `Github` 으로 설정한 뒤 레포지토리와 브랜치를 지정해줍시다.
+
+그리고 `Change detection options` 를 `Github webhooks` 로 설정해줘서 remote 상에서 파일의 변화가 생겼을 때 해당 파이프라인이 실행되도록 해주면 됩니다.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.44.34_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.44.34_PM.png)
+
+### Add Build Stage
+
+다음으로 빌드 단계에서 실행할 작업을 정의해줍시다. `Build provider` 는 `AWS CodeBuild` 로 설정하고, 이전에 만든 CodeBuild 프로젝트를 선택하면 됩니다.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.45.28_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.45.28_PM.png)
+
+### Add Deploy Stage
+
+마지막으로 배포 단계에서 실행할 작업을 정의해줍시다. `Deploy provider` 는 `AWS CodeDeploy` 로 설정한 뒤 조금 전에 만들었던 CodeDeploy 어플리케이션을 선택하고, 배포할 그룹을 설정해주면 됩니다.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.46.02_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.46.02_PM.png)
+
+자, 이로써 CodeBuild, CodeDeploy, CodePipeline 까지 모든 설정이 끝났습니다. `Next` 버튼을 누르면 현재까지 설정한 것들을 review 할 수 있습니다. 이마저 완료하면 해당 파이프라인이 생성되고, 다음과 같이 알아서 파이프라인이 돌아가고 있는 걸 확인할 수 있습니다.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.56.15_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.56.15_PM.png)
+
+---
+
+## 6. Test Your Pipeline
+
+실제로 배포가 잘 이뤄졌는지 확인해볼까요? ssh 로 EC2 에 접속해서 `appspec.yml` 에 정의했던 `destination` 폴더(`/deploy`)를 확인해봅시다. 아래 사진에서 알 수 있듯이 `buildspec.dev.yml` 안의 `artifacts` 에서 정의했던 파일들이 `/deploy` 폴더에 존재하고 있는 것을 확인할 수 있습니다.
+
+`docker ps` 명령으로 docker 프로세스가 잘 실행되고 있는 것 또한 확인할 수 있네요.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_8.06.22_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_8.06.22_PM.png)
+
+EC2 의 ip 주소와 서버에 할당된 포트번호를 브라우저에 입력해서 접속을 시도하면 다음과 같이 잘 연결되는 것 또한 확인할 수 있습니다.
+
+![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_8.06.55_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_8.06.55_PM.png)
+
+---
+
+## Recap
+
+지금까지 AWS IAM, CodeBuild, CodeDeploy, CodePipeline 과 Docker 를 활용하여 Node.js 프로젝트의 CI/CD 를 구축하는 과정에 대해서 살펴보았습니다. 여기서는 하나의 EC2 로만 배포하고 있는데, 실제로는 여러 EC2 로 배포할 수 있으며 이 때 로드밸런싱을 적용하여 배포 시 발생하는 다운타임을 최소화 시킬 수 있습니다. 또 여기서는 Docker Hub 에 이미지를 업로드 하고 있는데, AWS ECR 에 이미지를 올리고 또 가져올 수 있습니다. 개발자가 원하는 방법으로 배포 환경을 설정할 수 있는 AWS CodePipeline! 정말이지 안 쓰고는 못 배기겠습니다😀.
+
+## References
+
+- [Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
+
+- [AWS 시스템 관리자를 사용하여 CodeDeploy 에이전트 설치](https://docs.aws.amazon.com/ko_kr/codedeploy/latest/userguide/codedeploy-agent-operations-install-ssm.html)
+
+- [AppSpec 'hooks' 섹션](https://docs.aws.amazon.com/ko_kr/codedeploy/latest/userguide/reference-appspec-file-structure-hooks.html)
+
+- [Cloud Journey IO](https://www.cloudjourney.io/articles/devops/aws-codepipeline-td/)

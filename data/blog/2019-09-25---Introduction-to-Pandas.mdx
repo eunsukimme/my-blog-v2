@@ -1,0 +1,186 @@
+---
+title: Pandas 기초 사용법
+summary: Pandas 라이브러리를 다루는 기초적인 내용에 대해서 알아봅시다
+date: '2019-09-25T00:00:00.000Z'
+draft: false
+slug: 'pandas-basic'
+category: Data Science
+tags:
+  - TIL
+  - Python
+  - Data Science
+  - Pandas
+---
+
+Pandas 는 테이블 형태(row 와 columns 으로 구성된)인 tabular 데이터를 다루는데 특화된 Python 라이브러리입니다. Tabular 데이터는 SQL 과 Excel 데이터와 같은 기능을 하지만, Pandas 는 여기에 Python 의 강점을 더했습니다.
+
+# Create a DataFrame
+
+Pandas 는 *DataFrame*이라는 rows 와 columns 를 포함하는 특별한 형태의 Object 를 다룹니다. SQL 의 테이블을 생각하면 쉽습니다. Pandas 를 통해 SQL 쿼리나 Excel 스프레드시트, CSV 파일로부터 *DataFrame*을 쉽게 생성할 수 있습니다.
+
+Python 의 dictionary 로도 *DataFrame*을 생성할 수 있습니다. `pd.DataFrame()` 의 파라미터로 dictionary 를 주면, key 가 column 의 name 이 되고 value 가 columns 의 value 가 됩니다. 각 column 의 값들은 동일한 길이여야 합니다.
+
+```python
+import pandas as pd
+
+df1 = pd.DataFrame({
+    'name': ['John Smith', 'Jane Doe', 'Joe Schmo'],
+    'address': ['123 Main St.', '456 Maple Ave.', '789 Broadway'],
+    'age': [34, 28, 51]
+})
+```
+
+df1 을 출력하면 다음과 같습니다.
+
+| address        | age | name       |
+| -------------- | --- | ---------- |
+| 123 Main St.   | 34  | John Smith |
+| 456 Maple Ave. | 28  | Jane Doe   |
+| 789 Broadway   | 51  | Joe Schmo  |
+
+Python 의 dictionary 의 key 는 순서를 가지지 않기 때문에, 출력된 *DataFrame*의 컬럼 이름은 알파벳 순서로 정렬됩니다. 만약 컬럼 이름의 순서를 지정하고 싶다면 다음과 같이 작성할 수 있습니다.
+
+```python
+df2 = pd.DataFrame([
+    ['John Smith', '123 Main St.', 34],
+    ['Jane Doe', '456 Maple Ave.', 28],
+    ['Joe Schmo', '789 Broadway', 51]
+    ],
+    columns=['name', 'address', 'age'])
+```
+
+그러면 다음과 같이 컬럼 이름이 정렬됩니다.
+
+| name       | address        | age |
+| ---------- | -------------- | --- |
+| John Smith | 123 Main St.   | 34  |
+| Jane Doe   | 456 Maple Ave. | 28  |
+| Joe Schmo  | 789 Broadway   | 51  |
+
+# Loading and Saving CSVs
+
+만약 CSV 포맷으로 작성된 데이터가 존재한다면, *DataFrame*으로 불러올 수 있습니다. Pandas 에서 제공하는 `.read_csv()` 함수를 사용합니다.
+
+```python
+pd.read_csv('my-csv-file.csv')
+```
+
+또한 *DataFrame*을 CSV 포맷으로 저장할 수 있습니다.
+
+```python
+df.to_csv('new-csv-file.csv')
+```
+
+# Inspect a DataFrame
+
+적은 양의 데이터에 대해선 그냥 `print(df)` 명령으로 *DataFrame*의 구조를 살펴볼 수 있습니다. 하지만 데이터가 많으면 몇 가지 row 만 살펴보는 것이 좋은 방법일 수 있습니다. `.head(n)` 함수는 처음 n 개의 rows 를 반환합니다. Default 로 5 개를 반환합니다.
+
+```python
+df.head(10)		# 처음 10개의 rows를 반환합니다.
+```
+
+추가로 `df.info()` 함수는 각 column 에 대한 통계치를 나타냅니다.
+
+# Select Columns
+
+*DataFrame*에서 colums 을 선택하는 방법은 두 가지가 있습니다.
+
+1. Python 의 dictionary 를 key 로 참조하는 것과 같은 방법으로 *DataFrame*의 column 을 선택할 수 있습니다.(i.e., customers['age'])
+2. 만약 column 이름이 변수 명명 규칙을 따른다면(숫자로 시작하지 않고, 공백이 없으며, 특수문자를 포함하지 않는 등), 다음과 같이 column 을 참조할 수 있습니다: `customers.age`
+
+만약 단 하나의 column 을 선택하면 이를 _Series_ 라고 합니다. 여러 컬럼을 선택하면 type 은 *DataFrame*이며, 코드는 다음과 같이 작성할 수 있습니다.
+
+```python
+new_df = customers[['name', 'email']]		# name과 email column의 값들을 모두 가져옵니다.
+```
+
+# Select Rows
+
+다음과 같은 *DataFrame*이 있다고 가정해 봅시다.
+
+| id    | first_name | last_name | email                                                               | shoe_type    | shoe_material | shoe_color |
+| ----- | ---------- | --------- | ------------------------------------------------------------------- | ------------ | ------------- | ---------- |
+| 54791 | Rebecca    | Lindsay   | [RebeccaLindsay57@hotmail.com](mailto:RebeccaLindsay57@hotmail.com) | clogs        | faux-leather  | black      |
+| 53450 | Emily      | James     | [EmilyJames25@gmail.com](mailto:EmilyJames25@gmail.com)             | ballet flats | faux-leather  | navy       |
+| 91987 | Joyce      | Waller    | [Joyce.Waller@gmail.com](mailto:Joyce.Waller@gmail.com)             | sandals      | fabric        | black      |
+| 14437 | Justin     | Erickson  | [Justin.Erickson@outlook.com](mailto:Justin.Erickson@outlook.com)   | clogs        | faux-leather  | red        |
+| …     |            |           |                                                                     |              |               |            |
+
+*DataFrame*은 zero-indexed 입니다. 즉, 0 번 부터 시작합니다. 위 데이터에서 0 번부터 시작해서 2 번째 row 를 가져오고 싶다면 다음과 같이 코드를 작성할 수 있습니다.
+
+```python
+orders.iloc[2]
+```
+
+단 하나의 row 를 선택할때도 마찬가지로 _Series_ 가 반환됩니다. 여러개의 row 를 선택하고 싶은 경우 다음과 같이 코드를 작성할 수 있습니다.
+
+```python
+orders.iloc[3:7]		# 3번 ~ 6번 까지(7번 미포함)의 row를 반환합니다.
+orders.iloc[:4]			# 0번 ~ 3번 까지(4번 미포함)의 row를 반환합니다.
+orders.iloc[-3:]		# 뒤에서 부터 시작해서 3개의 row를 반환힙니다.
+```
+
+위의 방법은 데이터가 원하는 순서로 정렬된 상태에서 유용하게 쓰일 수 있습니다. 그러나 순서와 상관없이 논리적인 방법으로 row 를 선택하고 싶은 경우, 다음과 같이 코드를 작성할 수 있습니다.
+
+```python
+df[df.ColumnName == column_value]
+```
+
+만약 customers 란 *DataFrame*에서 age 가 30 인 row 를 선택하고 싶다면 다음과 같이 작성할 수 있습니다.
+
+```python
+customers[customers.age == 30]
+# 만약 age 가 30 보다 낮은 row를 찾고싶다면
+customers[customers.age < 30]		# 이렇게도 가능합니다.
+```
+
+이러한 방법으로 복잡한 로직을 수행한 결과를 가져올 수도 있습니다.
+
+```python
+# age가 30보다 낮거나 name이 'Martha Jones'인 row를 찾습니다.
+df[(df.age < 30) |
+   (df.name == 'Martha Jones')]
+```
+
+만약 특정 값이 어떠한 범주에 속하는지 알고싶다면 다음과 같이 작성할 수 있습니다.
+
+```python
+# name이 'Martha Jones','Rose Tyler', 'Amy Pond'에 포함된 row를 선택합니다.
+df[df.name.isin(['Martha Jones',
+     'Rose Tyler',
+     'Amy Pond'])]
+```
+
+# Setting indices
+
+만약 *DataFrame*의 index 가 어떠한 이유에 의해서 비연속적이라면, index 를 reset 해 줄 필요가 있습니다. 다음과 같은 데이터가 있다고 가정해 봅시다.
+
+|     | First Name | Last Name |
+| --- | ---------- | --------- |
+| 0   | John       | Smith     |
+| 4   | Jane       | Doe       |
+| 7   | Joe        | Schmo     |
+
+`df.reset_index()` 명령을 실행하면 위 *DataFrame*을 다음과 같이 변경할 수 있습니다.
+
+|     | index | First Name | Last Name |
+| --- | ----- | ---------- | --------- |
+| 0   | 0     | John       | Smith     |
+| 1   | 4     | Jane       | Doe       |
+| 2   | 7     | Joe        | Schmo     |
+
+이는 기존의 index 를 새로운 컬럼으로 만든 뒤 DataFrame 에 새로운 index 를 부여합니다. 만약 새로운 index column 을 만들고 싶지 않다면 `drop=True` 옵션을 부여할 수 있습니다. 또 `.reset_index()` 명령은 새로운 DataFrame 을 반환하는데, 새로운 걸 만들지 않고 기존의 것을 수정하고자 한다면 `inplace=True` 옵션을 부여할 수도 있습니다.
+
+# Review
+
+이번 포스팅에서는 Pandas 에 대해서 다음과 같은 내용을 알아보았습니다:
+
+- Create a table
+- Loading data from another file
+- Selecting certain rows or columns of a table
+
+훌륭한 데이터 분석 도구인 Pandas 공부를 계속해봅시다.😆
+
+# References
+
+- [Codecademy](http://www.codecademy.com)

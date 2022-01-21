@@ -1,0 +1,209 @@
+---
+title: D3.js 라이브러리를 활용한 데이터 시각화 - 개요
+summary: 오픈소스 데이터 시각화 라이브러리인 D3.js에 대해서 알아봅시다
+date: '2019-09-14T00:00:00.000Z'
+draft: false
+slug: 'd3-basic'
+category: 'Data Visualization'
+tags:
+  - Data Visualization
+  - Data
+  - D3
+socialImage: '/media/d3_logo.png'
+---
+
+웹 서비스를 개발하는 프로젝트를 진행하면서 유저의 데이터를 시각화할 필요가 생겨서 관련 라이브러리를 찾던 중, 우연히 D3 라는 라이브러리를 알게되었습니다. 기본 차트부터 빅데이터까지 데이터를 시각화하는데 유용한 추상화된 여러 메서드를 제공하는 D3 에 대해 공부하면서 배운 것들을 이 시리즈로 정리해 보려고 합니다.
+
+# D3.js 란?
+
+D3.js 는 데이터 주도 문서(Data-Driven Document)의 약자입니다. D3.js 는 웹 상에서 데이터를 시각화하려는 요구를 충족시키기 위해 설계되었습니다. D3.js 로 도표, 선 그래프, 파이 차트 등 기본적인 차트뿐만 아니라 네트워크, 지도, 계통도 등 복잡하고도 커스터마이징 된 여러 시각화 레이아웃을 생성할 수 있습니다.
+
+D3.js 는 마이크 보스톡(Mike Bostok)이란 사람이 창시하였는는데, 이 사람은 D3.js 를 다음과 같이 설명하고 있습니다.
+
+> "CSS3, HTML5, SVG 등 웹 표준 기능을 최대로 활용하여 독점적인 기술은 피하고 커다란 융통성을 제공한다"
+
+즉, 플래시나 자바 애플릿을 활용하지 않고 웹 표준에 부합한 SVG 와 DOM 을 결합하여 브라우저 안에서 동적인 콘텐츠를 매끄럽게 전달할 수 있게 된 것입니다. D3 의 진짜 장점은 이러한 웹 표준 적합성에만 있는 것이 아니라, 어떤 데이터 그래프도 그릴 수 있고, 당신이 상상하는 어떤 방법으로도 상호작용 할 수 있다는 것입니다. 이 시리즈 후반부에서는 D3 를 활용하여 어떻게 데이터를 마음대로 나타낼 수 있는지 알아보도록 하고, 지금부턴 D3 의 작동방식을 살펴보도록 합시다.
+
+# D3 의 작동 방식
+
+D3 의 구체적인 작동 방식을 살펴보기 전에 먼저 웹 개발의 기본 원리를 알아보고 앞으로 자주 접하게 될 패턴인 Selection(셀렉션)에 대해 알아봅시다.
+
+셀렉션은 DOM 요소를 가리키는 것으로, 찾아낸 첫 요소를 선택하는 d3.select()와 모든 요소를 선택하는 d3.selectAll()이 있습니다. 셀렉션은 데이터셋에 연결돼 있을 수 있는 하나 이상의 웹 페이지 요소의 그룹입니다.
+
+```javascript
+d3.selectAll('div').attr('background-color', 'pink')
+```
+
+위 코드는 모든 `<div>` 태그의 배경 색을 핑크색으로 바꾸는 셀렉션입니다.
+
+```javascript
+d3.selectAll('div').data([1, 2, 3, 4])
+```
+
+위 코드는 [1, 2, 3, 4] 배열에 있는 요소를 `<div>` 태그에 순서대로 바인딩합니다. D3 에서는 이러한 DOM 요소와 데이터의 연결을 **데이터 바인딩**이라고 하며, 셀렉션은 일련의 웹 페이지 요소와 이에 대응하는 일련의 데이터라고 생각하면 됩니다. 이때, 데이터와 요소의 개수가 서로 일치하지 않을 수도 있는데, 요소나 데이터를 생성하거나 제거하는 메서드를 D3 에서 제공합니다. 이 방법은 나중에 더 자세히 설명하도록 하고, 일단 셀렉션을 만든 후에는 D3 로 웹 페이지 요소의 모양을 변경해 데이터를 반영할 수 있습니다. 막대그래프의 길이를 데이터의 크기 값에 연동하거나 클래스에 대응하는 색으로 변경할 수도 있습니다.
+
+D3 를 사용하는 웹 페이지의 전형적인 처리 과정은 다음과 같습니다
+
+1. 스타일, 데이터, 콘텐츠를 로딩합니다
+
+2. 초기 화면에서 DOM 요소에 셀렉션을 통해 데이터를 바인딩합니다
+
+3. 페이지의 구조와 모습을 변경합니다
+
+4. 변경된 페이지의 구조와 모습에 사용자가 반응하고, 이는 콘텐츠를 더 많이 바뀌게 합니다
+
+5. 2 ~ 4 단계가 반복됩니다
+
+아직은 무슨 말인지 감이 잘 안올 것입니다. 나중에 바인딩된 데이터로 요소의 모습을 변경하는 예제를 보여줄 것인데 그때 이해하도록 하고 그냥 이런 흐름을 짚고 넘어가면 좋겠습니다.
+
+# 처음 만나는 D3 앱
+
+지금부터는 D3.js 를 활용하여 화면에 데이터를 나타내는 방법을 간단히 보여드리도록 하겠습니다. 먼저, 다음과 같은 html 파일을 생성합니다.
+
+```HTML
+<!doctype html>
+<html>
+  <head>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+  </head>
+  <body>
+  <body>
+</html>
+```
+
+이 HTML 파일을 크롬 브라우저에 띄운 다음, 개발자 도구의 콘솔 창을 띄우고 다음과 같은 코드를 작성해봅시다.
+
+```javascript
+d3.select('body').append('div').style('border', '1px black solid').html('hello world!')
+```
+
+그러면 브라우저 화면에 "hello world!"라는 글자가 검은 테두리에 둘러싸여 나타날 것입니다. 코드를 자세히 들여다보면, select('body') 뒤에 .append('div')가 따라왔습니다. 이는 `<body>` 태그 안에 자식 요소로 `<div>` 태그를 추가해준 것입니다. 다음으로 .style('border', '1px black solid')가 따라왔는데, 이는 CSS style 을 지정해 준 것으로 첫 번째 파라미터는 property 를, 두 번째 파라미터는 value 를 나타냅니다. 두 인자 모두 string 으로 전달해야 하는 걸 주의해야합니다. 마지막으로 html('hello world')로 `<div>` 태그의 HTML 텍스트를 "hello world"로 지정해 주었습니다.
+
+D3 는 .style() 메서드로 요소의 스타일링뿐만 아니라 속성과 이벤트 리스너를 부여해 상호작용성을 줄 수 있습니다.
+
+```javascript
+d3.select('div')
+  .style('background-color', 'pink')
+  .style('font-size', '24px')
+  .attr('id', 'newDiv')
+  .attr('class', 'd3div')
+  .on('click', () => console.log('you clicked div!'))
+```
+
+핑크색으로 변한 div 태그를 클릭하고 콘솔 창을 확인하면 'you clicked div'가 떠 있는 걸 확인할 수 있습니다.
+
+<img
+  src="https://img1.daumcdn.net/thumb/R1280x0/?scode=mtistory2&fname=https%3A%2F%2Fk.kakaocdn.net%2Fdn%2FFkE9s%2Fbtqt7S75WLC%2FeSKkKFbYH3QnqEJkzkf4p0%2Fimg.png"
+  alt=""
+/>
+
+# 도형을 포함한 D3 앱
+
+D3 의 사용 목적은 단순히 요소의 외형 및 속성 변경이 아니라 아마도 여러 도형을 활용하여 차트를 이쁘게 그리기 위함일 것입니다. 이번에는 SVG 요소를 추가하여 하위 요소에 선, 원, 사각형을 그려보도록 합시다. 먼저, 앞에서 작성한 HTML 의 body 안에 다음 코드를 작성합시다.
+
+```HTML
+<div id="vizcontainer">
+  <svg style="width:500px;height:500px;border: 1px lightgray solid;"></svg>
+</div>
+```
+
+이제 텍스트, 원을 추가해 보도록 합시다. 다음과 같은 각 코드를 콘솔 창에서 실행해봅시다.
+
+```javascript
+d3.select('svg')
+  .append('line')
+  .attr('x1', 20)
+  .attr('y1', 20)
+  .attr('x2', 400)
+  .attr('y2', 400)
+  .style('stroke', 'black')
+  .style('stroke-width', '1px')
+```
+
+위 코드는 svg 태그 안에 line 태그를 추가함으로써 선을 그립니다. line 태그는 (x1, y1), (x2, y2) 속성을 시작 지점, 도착지점으로 정하고 이를 연결합니다. 이때, x 축은 오른쪽이 증가하는 방향인 반면 y 축은 아래 방향이 증가하는 방향이므로 주의합시다. 마지막으로 stroke 속성은 테두리를 의미합니다.
+
+```javascript
+d3.select('svg').append('circle').attr('r', 20).attr('cx', 20).attr('cy', 20).style('fill', 'pink')
+```
+
+위 코드는 svg 태그 안에 circle 태그를 추가함으로써 원을 그립니다. circle 태그는 r, (cx, cy) 속성을 가지며 각각 반지름, 중심 위치를 의미합니다.
+
+```javascript
+d3.select('svg')
+  .append('rect')
+  .attr('width', '200')
+  .attr('height', '200')
+  .attr('x', 200)
+  .attr('y', 200)
+  .style('fill', 'blue')
+```
+
+위 코드는 svg 태그 안에 rect 태그를 추가함으로써 사각형을 그립니다. rect 태그는 (x, y), width, height 속성을 가지며 각각 시작 위치, 가로, 세로 길이를 나타냅니다. 위 코드를 콘솔에 입력한 후 브라우저상에 나타나는 모습은 다음과 같습니다.
+
+<img
+  width="400"
+  src="https://img1.daumcdn.net/thumb/R1280x0/?scode=mtistory2&fname=https%3A%2F%2Fk.kakaocdn.net%2Fdn%2Fw6zU5%2Fbtqt8nNtkUL%2FTWKdV8HYE1tgRx20TmeWFk%2Fimg.png"
+  alt=""
+/>
+
+하지만 데이터를 시각화할 때 실제로 이런 식으로 그림을 그리는 경우는 없을 것입니다. 기억해야 할 것은 이러한 도형들을 활용하여 당신의 나타내고자 하는 데이터를 효과적으로 시각화할 수 있다는 사실입니다. 자, 이제 마지막으로 D3 앱과 상호작용 하는 방법을 알아보도록 합시다.
+
+# D3 앱 과의 상호작용
+
+다음과 같은 코드를 콘솔 창에 입력해 봅시다.
+
+```javascript
+d3.select('svg')
+  .append('text')
+  .attr('x', 200)
+  .attr('y', 200)
+  .style('opacity', 0)
+  .html('hello world!')
+```
+
+... 화면상에 아무것도 나타나지 않을 것입니다. Opacity 를 0 으로 설정해 줬으니 투명도가 0 이 되어 당연한 결과입니다. 자, 이제 다음 코드를 콘솔 창에 입력해봅시다.
+
+```javascript
+d3.select('text').transition().delay(1000).style('opacity', 1)
+```
+
+엔터를 치고 1 초 뒤에 사각형 위에서 "hello world!"라는 글자가 부드럽게 나타나는 걸 확인할 수 있습니다. 축하합니다! 당신은 처음으로 동적인 시각화(?)를 구현했습니다. 여기서 transition() 메서드는 전환을 부드럽게 이뤄지게 만듭니다. delay() 메서드는 파라미터로 주어진 밀리초 시간만큼 지연시킵니다.
+
+한 가지만 더 해보도록 합시다. 콘솔 창에 다음과 같이 입력해봅시다.
+
+```javascript
+// 원 이동 함수
+const moveCircle = () => {
+  d3.select('circle').transition().duration(2000).attr('cy', 200)
+}
+// 사각형 이동 함수
+const moveRect = () => {
+  d3.select('rect').transition().duration(2000).attr('y', 50)
+}
+// 동시 이동 함수
+const move = () => {
+  moveCircle()
+  moveRect()
+}
+move()
+```
+
+원과 사각형이 동시에 부드럽게 움직이는 걸 확인할 수 있습니다다! 여기서 duration() 메서드는 설정을 지정한 시간(밀리초) 동안 일어나게 만듭니다. 이로써 D3 가 기본적으로 작동하는 방법을 알아봤습니다. 지금까지 배운 것들을 정리해보면 다음과 같습니다.
+
+# D3 개요 Review
+
+이번 포스팅에서 다음 내용들을 설명하였습니다.
+
+- D3 개요 및 작동방식
+
+- 페이지에서 요소를 생성하고 변경하는 데이터 바인딩과 셀렉션
+
+- D3 로 생성할 수 있는 데이터 시각화 도형 예제
+
+- 데이터 시각화와 상호작용성
+
+다음 포스팅부터는 D3 를 활용하는 다양한 기법들을 살펴보고, 실용적인 그래프를 그리는 방법을 알아보도록 합시다.
+
+# References
+
+- D3.js 인 액션

@@ -1,0 +1,278 @@
+---
+title: Build your own React - Function Component 그리고 Hooks
+summary: React Function Component 와 Hooks 의 동작 원리에 대해서 알아봅시다
+date: '2021-09-12T20:30:00.000Z'
+draft: false
+slug: 'how-react-function-component-and-hooks-work'
+category: Frontend
+tags:
+  - Frontend
+  - Browser
+  - React
+  - Function Component
+  - Hooks
+socialImage: '/media/react.png'
+---
+
+> 이 포스팅은 AUSG 5기 Frontend Deep Dive 스터디에서 [Build your own React](https://pomb.us/build-your-own-react/) 포스팅을 읽고 학습한 내용을 기록한 것입니다. 원문 내용에 더해 React 동작 원리를 이해하는데 도움이 되는 내용이 포함되어 있습니다. 글의 내용과 관련한 피드백은 언제나 환영합니다.
+
+[지난 포스팅](https://blog.eunsukim.me/posts/how-react-reconciliation-works)에서는 React가 DOM의 변경사항을 처리하는 재조정(Reconciliation) 알고리즘에 대해 알아보았다. 이번 포스팅에서는 함수형 컴포넌트와 hooks가 어떻게 동작하는지 살펴보도록 하자.
+
+## Step VII: Function Components
+
+먼저 다음과 같은 함수 컴포넌트가 있다고 가정해보자.
+
+```jsx
+function App(props) {
+  return <h1>Hi {props.name}</h1>
+}
+const element = <App name="foo" />
+```
+
+위 컴포넌트는 트랜스파일 후 아래와 같이 변경된다.
+
+```jsx
+function App(props) {
+  return Didact.createElement('h1', null, 'Hi ', props.name)
+}
+const element = Didact.createElement(App, {
+  name: 'foo',
+})
+```
+
+트랜스파일된 코드를 살펴보면, element 는 type 이 `App` 인 React element를 가리키게 된다. 그런데 `App` 이란 type 의 HTML element는 실제로 존재하지 않는다. `App`은 우리가 작성한 함수를 나타내기 때문이다. 이 `App` 이란 함수를 실행해야 비로소 type이 h1인 React element가 생성된다. 즉, 함수 컴포넌트가 실행되서 생성된 React element는 props로 children을 전달받는 것이 아닌 함수를 호출하여 children을 반환한다.
+
+정리하면, 함수 컴포넌트는 일반 JSX와 다음 두 가지 차이점이 있다.
+
+- 함수형 컴포넌트에 대응되는 fiber는 DOM 노드를 갖지 않는다. `App`이란 태그의 DOM element가 없기 때문이다.
+
+- 함수형 컴포넌트는 `children`을 props 로 전달받지 않고 함수를 호출하여 `children`을 반환한다.
+
+이를 위해 우리는 `performUnitOfWork` 함수에서 `nextUnitOfWork`를 처리할 떄 함수형 컴포넌트인지에 따라 다르게 처리해줄 수 있다.
+
+```jsx
+function performUnitOfWork(fiber) {
+  const isFunctionComponent = fiber.type instanceof Function
+  // fiber의 type이 함수를 가리키는 경우, 즉 함수형 컴포넌트인 경우
+  if (isFunctionComponent) {
+    updateFunctionComponent(fiber)
+  }
+  // fiber의 type이 string literal인 경우
+  else {
+    updateHostComponent(fiber)
+  }
+  // return(select) next unit of work...(생략)
+}
+
+function updateFunctionComponent(fiber) {
+  // 함수형 컴포넌트에 대한 fiber는 DOM 노드를 갖지 않는다
+  // 함수형 컴포넌트는 호출하여 children을 반환한다
+  const children = [fiber.type(fiber.props)]
+  reconcileChildren(fiber, children)
+}
+​
+function updateHostComponent(fiber) {
+  if (!fiber.dom) {
+    fiber.dom = createDom(fiber)
+  }
+  reconcileChildren(fiber, fiber.props.children)
+}
+```
+
+`performUnitOfWork` 함수에서 DOM을 생성하고 children element에 대한 fiber를 생성하는 기존 로직을 `updateHostComponent`로 옮기고, 함수형 컴포넌트인 경우 `updateFunctionComponent` 함수를 호출하도록 변경하였다. 이 함수에서는 fiber가 참조하는 함수 컴포넌트를 호출하여 반환된 children을 reconciliation하도록 한다. 맨 처음 언급한 예제를 바탕으로 한다면 `fiber.type` 은 `App` 이 되고 이를 실행하면 `h1` element가 반환된다.
+
+다음으로 수정할 부분은 commit phase인데, 지금까지는 render phase에서 각 fiber에 대한 DOM 노드를 생성해주었기 때문에 commit phase에서 모든 fiber에 대한 DOM 노드가 무조건 존재한다고 가정할 수 있었다. 그러나 함수형 컴포넌트는 render phase에서 DOM 노드를 생성하지 않기 때문에 commit phase에서 모든 fiber가 DOM 노드를 갖고 있다고 확신할 수 없다.
+
+이 때문에 DOM 노드를 DOM 트리에 추가하고 삭제하는 부분을 수정해야 한다. 먼저 DOM 노드를 추가할 떄 parent fiber에 대한 DOM 노드가 있는지 조사하고, 만약 parent fiber가 함수형 컴포넌트라 DOM 노드가 없다면 parent의 parent fiber에 DOM을 추가해야 한다. 이 과정은 parent fiber의 DOM이 존재할 때 까지 타고 올라가도록 한다.
+
+```jsx
+function commitWork(fiber) {
+  if (!fiber) {
+    return
+  }
+​
+  let domParentFiber = fiber.parent
+  // parent fiber가 DOM 노드를 가질 때 까지 위로 올라간다
+  while (!domParentFiber.dom) {
+    domParentFiber = domParentFiber.parent
+  }
+  const domParent = domParentFiber.dom
+​
+  if (
+    fiber.effectTag === "PLACEMENT" &&
+    fiber.dom != null
+  ) {
+    // 현재 fiber의 DOM 노드를 타고 올라간 parent fiber의 DOM 노드에 append 한다.
+    domParent.appendChild(fiber.dom)
+  }
+  // UPDATE, DELETE...(생략)
+}
+```
+
+다음으로 DOM 노드를 삭제하는 부분을 수정한다. 만약 DOM 노드가 없는 함수형 컴포넌트를 삭제해야 하는 경우 DOM 노드가 있는 child fiber를 찾을 때 까지 타고 내려간다. DOM 노드를 가진 child fiber를 찾으면, 해당 fiber의 DOM 노드를 parent fiber의 DOM 노드에서 제거한다.
+
+```jsx
+function commitWork(fiber) {
+  // PLACEMENT...(생략)
+
+  else if (fiber.effectTag === "DELETION") {
+    commitDeletion(fiber, domParent)
+  }
+  // UPDATE...(생략)
+}
+
+function commitDeletion(fiber, domParent) {
+  // DOM 노드를 가진 child fiber를 찾으면 parent fiber의 DOM 노드에서 제거한다
+  if (fiber.dom) {
+    domParent.removeChild(fiber.dom)
+  }
+  // DOM 노드를 갖는 child fiber를 찾을 때 까지 내려간다
+  else {
+    commitDeletion(fiber.child, domParent)
+  }
+}
+```
+
+이렇게 하면 이제 우리가 작성한 코드로 함수형 컴포넌트를 렌더링 할 수 있다.
+
+<div>
+  <iframe
+    src="https://codesandbox.io/embed/didact-7-function-component-vmrdl?autoresize=1&fontsize=14&hidenavigation=1&theme=dark"
+    style={{ width: '100%', height: '500px', border: 0, borderRadius: '4px', overflow: 'hidden' }}
+    title="didact-7 (Function Component)"
+    allow="accelerometer; ambient-light-sensor; camera; encrypted-media; geolocation; gyroscope; hid; microphone; midi; payment; usb; vr; xr-spatial-tracking"
+    sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
+  ></iframe>
+</div>
+
+## Step VIII: Hooks
+
+이제 함수형 컴포넌트 안에서 사용할 수 있는 hook을 만들어보자. 이번에는 버튼을 클릭하면 카운트가 증가하는 고전적인 카운터 컴포넌트를 예시로 들어보자.
+
+```jsx
+function Counter() {
+  const [state, setState] = Didact.useState(1)
+
+  return (
+    <div>
+      <h1>Count: {state}</h1>
+      <button onClick={() => setState((c) => c + 1)}>increment</button>
+    </div>
+  )
+}
+const element = <Counter />
+```
+
+`useState` 훅을 직접 구현하기 전에, 이 카운터 컴포넌트에서 호출하는 `useState` 훅이 어떻게 동작하는지 생각해보자. 먼저 initial value 로 `1` 이란 값을 전달하여, `state`를 1로 초기화하였다. `useState` 훅을 호출하여 반환된 `state`는 JSX element의 children으로 전달된다. 좀 더 정확히는 `state`가 React element의 props의 children에 전달되어, render phase에서 이를 바탕으로 DOM 노드가 생성되고, commit phase에서 DOM 트리에 추가되어 화면에 나타나게 된다.
+
+또 `useState`는 `state`의 값을 변경하는 `setState` 함수도 반환하는데, 여기서는 버튼을 클릭하면 `setState`를 함수를 호출하고 파라미터로 이전 state를 받아 다음 state를 반환하는 함수를 전달하였다. 그리하여 버튼을 클릭했을 때 state의 값이 바뀌고, 카운터 컴포넌트는 리렌더링 된다. 좀 더 정확히는 state가 변경되어 render phase에서 fiber 트리의 변경사항이 만들어지고, commit phase에서 변경된 fiber를 바탕으로 DOM 노드를 수정한다.
+
+자, 여기까지 `useState` 훅의 동작을 살펴보았으니, 이제 직접 구현해보도록 하자. 먼저 render phase에서 함수형 컴포넌트를 호출하기 전, 현재 함수 컴포넌트에 대한 fiber `wipFiber` 라고 하자. 그리고 `wipFiber`가 참조하는 훅들을 트래킹하기 위해 `hooks` 필드를 추가하고 이를 인덱싱하는 `hookIndex`도 생성한다.
+
+```jsx
+let wipFiber = null
+let hookIndex = null
+​
+function updateFunctionComponent(fiber) {
+  wipFiber = fiber
+  hookIndex = 0
+  wipFiber.hooks = []
+  const children = [fiber.type(fiber.props)]
+  reconcileChildren(fiber, children)
+}
+```
+
+다음으로 `useState` 함수를 만들자. 먼저 `useState`를 호출하면 state를 반환하는 기능부터 구현해보자. 일단 함수 컴포넌트가 호출되면, 그 안에서 사용된 `useState`가 호출되고 여기서 기존에 추가한, 즉 직전에 commit된 fiber tree에서 `wipFiber`에 대응되는 fiber(`alternate`)에 추가된 훅(`oldHook`)이 있는지 먼저 조사한다. 만약 `oldHook`이 존재한다면 해당 state를 그대로 새로운 훅(`hook`)에 가져오고, 그렇지 않은 경우 파라미터로 받은 초기값을 새로운 훅의 값으로 사용한다. 마지막으로 새로 정의된 훅을 `wipFiber`의 hooks 필드에 추가하고 state를 반환한다.
+
+```jsx
+function useState(initial) {
+  // 직전에 커밋된 fiber가 참조하는 hook
+  const oldHook =
+    wipFiber.alternate &&
+    wipFiber.alternate.hooks &&
+    wipFiber.alternate.hooks[hookIndex]
+  // oldHook이 존재한다면 해당 훅의 값을 새로운 훅의 값으로 덮어쓴다.
+  const hook = {
+    state: oldHook ? oldHook.state : initial,
+  }
+​
+  wipFiber.hooks.push(hook)
+  hookIndex++
+  return [hook.state]
+}
+```
+
+이제 `useState`가 `setState`를 반환하도록 만들어보자. `setState` 함수는 이전 상태를 받아서 다음 상태를 반환하는 `action` 이라는 함수를 파라미터로 받는다고 가정하자(실제 React에선 그냥 값을 받을 수도 있다). 이 `action`은 `setState`가 호출된 즉시 실행하지 않고 일단 큐에 넣은 뒤, 배치가 되어 처리될 수 있도록 하자. 그래서 다음 render phase에서 함수 컴포넌트가 실행되어 훅이 호출될 때 큐에 저장된 모든 `action`들이 한번에 실행되도록 한다.
+
+일단 `setState` 함수가 호출되면, 해당 함수 컴포넌트는 리렌더링 되어야 한다. 그리하여 `setState`는 `render` 함수와 비슷하게 새 `wipRoot` 를 바로 직전에 커밋된 `currentRoot`의 것들로 저장한 뒤 `nextUnitOfWork` 로 지정하여 새로운 render phase를 시작하도록 한다.
+
+```jsx
+function useState(initial) {
+  const oldHook =
+    wipFiber.alternate &&
+    wipFiber.alternate.hooks &&
+    wipFiber.alternate.hooks[hookIndex]
+  const hook = {
+    state: oldHook ? oldHook.state : initial,
+    // setState의 파라미터로 전달된 action들을 저장하는 큐
+    queue: [],
+  }
+
+  // oldHook의 queue에 저장된 actions 들을 모두 호출하여 state를 변경한다
+  const actions = oldHook ? oldHook.queue : []
+  actions.forEach(action => {
+    hook.state = action(hook.state)
+  })
+​
+ const setState = action => {
+   // action을 바로 실행하지 않고 일단 queue에 넣는다
+    hook.queue.push(action)
+    // nextUnitOfWork로 새로운 wipRoot를 지정하여 render phase를 시작한다
+    wipRoot = {
+      dom: currentRoot.dom,
+      props: currentRoot.props,
+      alternate: currentRoot,
+    }
+    nextUnitOfWork = wipRoot
+    deletions = []
+  }
+​
+  wipFiber.hooks.push(hook)
+  hookIndex++
+  return [hook.state, setState]
+}
+```
+
+이렇게 하면 함수 컴포넌트 내에서 사용 가능한 `useState` 훅이 만들어진다.
+
+<div>
+  <iframe
+    src="https://codesandbox.io/embed/didact-8-function-component-and-hooks-dg4d5?autoresize=1&fontsize=14&hidenavigation=1&theme=dark"
+    style={{ width: '100%', height: '500px', border: '0', borderRadius: '4px', overflow: 'hidden' }}
+    title="didact-8 (Function Component and Hooks)"
+    allow="accelerometer; ambient-light-sensor; camera; encrypted-media; geolocation; gyroscope; hid; microphone; midi; payment; usb; vr; xr-spatial-tracking"
+    sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
+  ></iframe>
+</div>
+
+## Recap
+
+이번 포스팅에서는 함수 컴포넌트와 훅이 어떻게 동작하는지 살펴보았다. 여기서 소개한 내용을 정리하면 다음과 같다.
+
+- 함수 컴포넌트에 대응되는 fiber는 DOM 노드가 없고, 호출해서 children을 반환한다
+
+- `useState` 훅이 반환한 state를 포함하는 JSX는 render phase에서 state를 children으로 갖는 fiber를 만든다. 이는 state의 변경이 해당 state를 children으로 갖는 fiber에만 영향을 미치는 것을 의미한다
+
+- `setState`를 호출하면 파라미터로 전달된 `action`이 바로 실행되는 것이 아니라 큐에 저장되고, 다음 render phase에 한꺼번에(배치) 실행된다.
+
+## 마치며
+
+지금까지 총 4편의 글을 작성하여 [Build your own React](https://pomb.us/build-your-own-react/) 아티클을 리뷰하였다. 각 단계별로 작성된 소스코드는 나의 [Github 레포지토리](https://github.com/eunsukimme/Didact-Playground/tree/main)에서 확인할 수 있다. 원본 아티클의 소스코드 Javascript로 작성되었지만 필자는 Typescript를 즐겨 쓰기 때문에 원문 소스코드를 Typescript로 포팅하였다.
+
+이 글을 읽으면서 배운점이 많았다. JSX가 DOM element로 해석되는 과정에서 Babel, Typescript 같은 빌드 툴의 역할과 React의 역할이 무엇인지 분명하게 구분지어 이해할 수 있었다. 또 함수형 컴포넌트, 훅과 같은 React API의 내부 동작 원리를 간단하게나마 이해할 수 있게 되었다. 나아가 Fiber 자료구조가 어떻게 활용되는지를 보면서 그동안 모호하게 느껴졌던 Virtual DOM이 어떤 원리로 동작하고, 어떤 이점이 있는지를 정확히 이해할 수 있게 되었다.
+
+마지막으로 느낀점은 React는 정말 잘 만든 라이브러리구나 라는 생각이 들었다. React를 만드는 데 있어 처음 아이디어를 구상하고 이를 개발하여 많은 개발자들의 사랑을 받기까지 노력해온 컨트리뷰터들에게 존경심을 표하게된다. 오늘도 난 세상에 대단한 개발자들이 참 많다는 걸 느낀다.
+
+## References
+
+- [Build your own React](https://pomb.us/build-your-own-react/)

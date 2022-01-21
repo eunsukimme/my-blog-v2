@@ -1,0 +1,249 @@
+---
+title: Redux Middleware Deep Dive
+summary: Redux 미들웨어를 직접 만들어보면서 미들웨어의 동작 원리에 대해 알아봅시다
+date: '2020-06-14T23:30:00.000Z'
+draft: false
+slug: 'redux-middleware-deep-dive'
+category: Frontend
+tags:
+  - Frontend
+  - Redux
+  - Javascript
+socialImage: '/media/redux.png'
+---
+
+이번 포스팅에서는 Redux 미들웨어가 어떻게 구성되어 있는지 알아보기 위해 [Redux Github](https://github.com/reduxjs/redux) 에 올라와있는 소스코드를 직접 뜯어보고, 간단한 미들웨어를 직접 만들어봄으로써 Redux 미들웨어의 동작 원리에 대해 알아보도록 하곘습니다.
+
+## Getting Started
+
+먼저 특정 액션이 디스패치되면, 해당 액션을 콘솔창에 로깅(Logging)한 다음, 다음 상태를 로깅하는 간단한 '로깅' 미들웨어를 만들어 보도록 하겠습니다. 이러한 로깅 미들웨어는 다음과 같이 작성할 수 있습니다.
+
+```js
+const logger1 = (store) => (next) => (action) => {
+  console.log('LOGGER1: dispatching', action)
+  let result = next(action)
+  return result
+}
+
+const logger2 = (store) => (next) => (action) => {
+  console.log('LOGGER2: dispatching', action)
+  let result = next(action)
+  return result
+}
+```
+
+먼저 `logger1`, `logger2` 라는 두 개의 미들웨어를 만들어 보았습니다. 두 개를 만든 이유는 나중에 말씀드릴테니, 일단 미들웨어의 형태에 집중해 보도록 합시다. Redux 미들웨어는 다음과 같은 형태를 띄고 있습니다.
+
+```js
+const middleware = (store) => (next) => (action) => {
+  let result = next(action)
+  // result는 다음 미들웨어가 return한 값이 됩니다.
+  // 만약 다음 미들웨어가 return 한 값을 수정하지 않는다면 result는 현재 action객체가 됩니다.
+  return result
+}
+```
+
+참으로 기기괴괴 하죠? `store` 를 파라미터로 받아서, 다음 미들웨어로 액션을 전달하는 `next` 를 인자로 받는 함수를 반환하고, 이 함수는 또 `action` 을 파라미터로 받습니다. ES6 의 arrow function 을 활용하여 [currying](https://en.wikipedia.org/wiki/Currying) 한 문법이 익숙치 않은 분들을 위해 다음과 같이 표현해보겠습니다.
+
+```js
+function middleware(store) {
+  return function wrapDispatchByMiddleware(next) {
+    return function dispatch(action) {
+      let result = next(action)
+      return result
+    }
+  }
+}
+```
+
+이렇게 하니 구문을 조금 해석할 수 있을 것 같네요. `middleware` 는 `store` 를 인자로 받고, `dispatch` 함수를 wrapping 하는 함수 `wrapDispatchByMiddleware`를 반환하고 있습니다. 왜 이러한 형태로 미들웨어를 작성해야 하는 것일까요? 그 이유는 스토어에 미들웨어를 등록하는 `applyMiddleware` 함수를 들여다보면 알 수 있습니다.
+
+## Redux - applyMiddleware
+
+[Redux Github](https://github.com/reduxjs/redux/blob/master/src/applyMiddleware.ts) 에서 `applyMiddleware` 함수 정의를 살펴보면 다음과 같습니다.
+
+```ts
+export default function applyMiddleware(...middlewares: Middleware[]): StoreEnhancer<any> {
+  return (createStore: StoreCreator) => <S, A extends AnyAction>(
+    reducer: Reducer<S, A>,
+    ...args: any[]
+  ) => {
+    const store = createStore(reducer, ...args)
+    let dispatch: Dispatch = () => {
+      throw new Error(
+        'Dispatching while constructing your middleware is not allowed. ' +
+          'Other middleware would not be applied to this dispatch.'
+      )
+    }
+
+    const middlewareAPI: MiddlewareAPI = {
+      getState: store.getState,
+      dispatch: (action, ...args) => dispatch(action, ...args),
+    }
+    const chain = middlewares.map((middleware) => middleware(middlewareAPI))
+    dispatch = compose<typeof dispatch>(...chain)(store.dispatch)
+
+    return {
+      ...store,
+      dispatch,
+    }
+  }
+}
+```
+
+복잡해 보이지만, 지금은 다른 것은 살펴보지 않도록 하고 미들웨어를 chaining 하는 코드를 봅시다. `middleware.map()` 으로 각 미들웨어를 가져와 `middlewareAPI` 를 전달하여 호출하고 있습니다. 여기서 `middlewareAPI` 는 `store`를 mocking 한 객체로, 미들웨어에서 필요로하는 두 메서드 `getState`와 `dispatch` 를 갖고 있습니다.
+
+미들웨어가 호출되면 `dispatch` 를 wrapping 한 함수가 반환된다는 것을 조금 전 위에서 확인했었는데요. `chain` 은 `dispatch` 를 wrapping 한 함수들(`(next) => (action) => {}`)로 구성되어 있을 것입니다. 그 다음 코드를 보면 이 `chain` 을 `compose` 란 메서드에 파라미터로 넘겨주고 있습니다.
+
+## Redux - compose
+
+`compose` 또한 [Redux Github](https://github.com/reduxjs/redux/blob/master/src/compose.ts) 에서 살펴볼 수 있는데, 다음과 같이 작성되어 있습니다.
+
+```ts
+export default function compose(...funcs: Function[]) {
+  if (funcs.length === 0) {
+    // infer the argument type so it is usable in inference down the line
+    return <T>(arg: T) => arg
+  }
+
+  if (funcs.length === 1) {
+    return funcs[0]
+  }
+
+  return funcs.reduce((a, b) => (...args: any) => a(b(...args)))
+}
+```
+
+`compose` 함수는 생각보다 간단합니다. 함수의 개수가 0이면, 즉 미들웨어가 존재하지 않으면 인자로 받은 `arg` 를 그대로 반환하는 순수함수를 return 하고, 미들웨어가 1개면 해당 미들웨어를 그대로 return 해줍니다. 우리가 주목할 부분은 바로 미들웨어가 2개 이상이여서 `if` 문에서 걸러지지 않는 경우인데요, 코드 마지막 줄을 들여다 보겠습니다.
+
+```ts
+return funcs.reduce((a, b) => (...args: any) => a(b(...args)))
+```
+
+파라미터가 `a`, `b` 로 되있어서 복잡해 보일 수 있는데요. 제가 이번 포스팅의 맨 처음 미들웨어 `logger1`, `logger2` 총 2개를 정의한 이유가 바로 여기에 있습니다. 이 부분에 대한 이해를 돕기 위해서 인데요. 만약 저희가 `applyMiddleware` 의 파라미터로 `logger1`과 `logger2` 를 전달하였다고 가정해보면, `chain` 은 각 미들웨어가 반환한, 즉 `dispatch` 를 wrapping 한 함수의 배열일 것입니다. 그러면 아래 코드는 바로 위의 코드와 동일한 기능을 한다고 볼 수 있습니다.
+
+```ts
+// 원래 Array.reduce() 의 파라미터로 acc, val 가 주어지지만
+// 입력으로 주어진 함수의 length 가 2 이고, 파라미터로 initialValue 를 전달하지 않았기 때문에
+// 함수의 첫 번재 요소가 logger1 가 반환한 함수이고, 두 번째 요소는 logger2 가 반환한 함수가 됩니다.
+return funcs.reduce((wrapDispatchByLogger1, wrapDispatchByLogger2) => (...args: any) =>
+  wrapDispatchByLogger1(wrapDispatchByLogger2(...args))
+)
+```
+
+자, 이렇게 해서 `compose`는 입력으로 함수들을 받고, return 값은 `(x) => f(g(x))` 와 같이 `합성함수를 반환하는 함수`란 것을 알게 되었습니다. 다시 `applyMiddleware` 로 돌아가서 해당 값을 대입해 보도록 하겠습니다.
+
+```ts
+dispatch = compose<typeof dispatch>(...chain)(store.dispatch)
+```
+
+여기서 `compose` 함수의 return 값을 대입해주면 다음과 같이 나타낼 수 있습니다.
+
+```ts
+// compose 의 return 값은 (x) => f(g(x)) 와 같은 함수이고, 이를 임의로 returnFunctionByCompose라고 naming하였습니다.
+// 이 이름은 중요하지 않으며, 이 코드가 compose 가 실행된 직후의 모습이란 것에 주목해 주시기 바랍니다.
+dispatch = returnFunctionByCompose(store.dispatch)
+```
+
+마지막으로 `store.dispatch` 라는 파라미터를 전달하여 호출하면 다음과 같이 나타낼 수 있습니다.
+
+```ts
+dispatch = wrapDispatchByLogger1(wrapDispatchByLogger2(store.dispatch))
+```
+
+자, 이렇게 해서 미들웨어를 apply 하는 과정이 끝났습니다. 이제 위 코드가 의미하는 것이 무엇인지 이해해 보도록 합시다.
+
+## Put it Together
+
+먼저, `wrapDispatchByLogger2` 란 함수의 인자로 `store.dispatch` 를 전달해주었습니다. 이는 `wrapDispatchByLogger2` 함수의 context 안에서 `next` 라는 이름으로 참조됩니다. 마찬가지로, `wrapDispatchByLogger2` 가 반환하는 `dispatch(action)` 함수를 `wrapDispatchByLogger1` 함수의 context 안에서 `next` 라는 이름으로 참조됩니다. 이를 정리한 그림은 아래와 같습니다.
+
+<figure>
+  <img
+    style={{ objectFit: 'contain' }}
+    alt="Applying Redux Middleware"
+    src="/media/redux/middleware/apply.png"
+  />
+  <figcaption style={{ color: 'grey' }}>Redux Middleware를 apply 하는 과정</figcaption>
+</figure>
+
+이렇게 미들웨어가 조합된 뒤 만들어지는 `dispatch` 를 우리가 사용하게 되는 것이죠. 만약 이렇게 만들어진 `dispatch` 로 액션을 디스패치 하게되면 어떻게 될까요? 그 과정을 그림으로 나타내면 다음과 같습니다.
+
+<figure>
+  <img
+    style={{ objectFit: 'contain' }}
+    alt="Dispatching an action to Redux Middleware"
+    src="/media/redux/middleware/dispatch.png"
+  />
+  <figcaption style={{ color: 'grey' }}>Action 이 Middleware 를 거쳐 Dispatch 되는 과정</figcaption>
+</figure>
+
+`dispatch` 를 조합하던 순서와 정확히 반대로 흘러가게 됩니다. 먼저 `wrapDispatchByLogger` 이 반환한 `dispatch` 를 먼저 실행하게 되고, `next(action)` 을 호출하면 `wrapDispatchByLogging2` 함수가 반환한 `dispatch` 를 실행하게 되는 것이죠. 마지막으로 `next(action)` 을 호출하게 되면 그 때 `store.dispatch` 가 호출되어 액션이 리듀서에게 전달되게 되는 것입니다.
+
+## Implement Logging Middleware
+
+지금까지 Redux Middleware의 동작 원리에 대해 살펴보았으니, 이해를 확실히 하기 위해 실제로 로깅 미들웨어를 적용해 보도록 하겠습니다. 지난 포스팅에서 활용했던 Redux Todo 예제를 다시 사용해보겠습니다. 수정 사항은 모두 원래대로 돌려두고, `index.js` 를 다음과 같이 수정해주세요.
+
+```js
+import React from 'react'
+import { render } from 'react-dom'
+import { createStore, applyMiddleware } from 'redux'
+import { Provider } from 'react-redux'
+import App from './components/App'
+import rootReducer from './reducers'
+
+const logger1 = (store) => (next) => (action) => {
+  console.log('LOGGER1: dispatching', action)
+  let result = next(action)
+  return result
+}
+
+const logger2 = (store) => (next) => (action) => {
+  console.log('LOGGER2: dispatching', action)
+  let result = next(action)
+  return result
+}
+
+const store = createStore(rootReducer, applyMiddleware(logger1, logger2))
+
+render(
+  <Provider store={store}>
+    <App />
+  </Provider>,
+  document.getElementById('root')
+)
+```
+
+`logger1`, `logger2` 미들웨어를 만들고 `applyMiddleware` 함수의 파라미터로 전달하였습니다. 그리고 `createStore` 의 두 번째 파라미터로 이를 전달해주었습니다. 변경된 사항이 잘 적용되었는지 테스트를 해봅시다. 저장 후 `yarn start` 명령을 실행해주세요.
+
+<figure>
+  <img
+    style={{ width: '400px', objectFit: 'contain' }}
+    alt="Redux Todo Example"
+    src="/media/redux/todo_example.png"
+  />
+  <figcaption style={{ color: 'grey' }}>Redux 의 todos 예제를 실행한 화면</figcaption>
+</figure>
+
+이제 새로운 TODO 를 추가해 봅시다. 그리고 로깅 미들웨어가 잘 적용되어 있는지도 확인해 볼 수 있도록 콘솔 탭을 열어봅시다.
+
+<figure>
+  <img
+    style={{ objectFit: 'contain' }}
+    alt="Redux Todo Example"
+    src="/media/redux/middleware/example.png"
+  />
+  <figcaption style={{ color: 'grey' }}>Todo를 추가한 모습</figcaption>
+</figure>
+
+로깅 미들웨어가 잘 적용되어 콘솔에 액션이 찍힌 것을 확인할 수 있습니다! 순서도 `logger1`이 먼저 실행되고 그 다음 `logger2` 가 실행된 것을 확인할 수 있습니다.
+
+## Recap
+
+지금까지 Redux에서 미들웨어가 적용되는 과정을 살펴보고, 간단한 미들웨어를 직접 구현하여 적용해보는 시간을 가졌습니다. 미들웨어의 구현은 간단하지만, 그 안에 포함된 내용들은 그리 간단하지만은 않다는 것을 느낄 수 있었습니다. 이번 포스팅에서는 로깅과 같이 간단한 미들웨어를 구현해보았는데, 실제로 미들웨어의 가장 큰 장점은 순수하지 않은 로직들을 처리할 수 있다는 것이라고 이전 포스팅에서 언급하였습니다. 다음 포스팅에서는 순수하지 않은 로직을 처리하기위해 미들웨어를 어떻게 사용할 수 있는지 알아보도록 하겠습니다.
+
+## References
+
+- [Redux Middleware](https://redux.js.org/advanced/middleware)
+- [Redux applyMiddleware](https://redux.js.org/api/applymiddleware)
+- [Redux Github](https://github.com/reduxjs/redux)
+- [Javascript Array Reduce](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce)

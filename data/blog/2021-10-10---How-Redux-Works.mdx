@@ -1,0 +1,260 @@
+---
+title: How Redux Works
+summary: Redux가 내부적으로 어떻게 동작하는지 알아봅시다
+date: '2021-10-10T16:30:00.000Z'
+draft: false
+slug: 'how-redux-works'
+category: Frontend
+tags:
+  - Frontend
+  - State Management
+  - Redux
+socialImage: '/media/redux.png'
+---
+
+Redux는 어떤 원리로 동작하는 것일까? 그것을 알아보자.
+
+> 이 글에서는 Redux의 기본 구성요소(store, reducer, action, etc)를 이해하고 있다고 가정한다. 이 구성요소에 대한 자세한 내용은 [공식 문서](https://redux.js.org/introduction/core-concepts)를 참고하자.
+
+먼저, Redux가 어떻게 활용되는지 Redux 공식 문서에 있는 [예시 코드](https://redux.js.org/introduction/getting-started#basic-example)를 보자.
+
+## Example
+
+```js
+import { createStore } from 'redux'
+
+function counterReducer(state = { value: 0 }, action) {
+  switch (action.type) {
+    case 'counter/incremented':
+      return { value: state.value + 1 }
+    case 'counter/decremented':
+      return { value: state.value - 1 }
+    default:
+      return state
+  }
+}
+
+// store API 는 { subscribe, dispatch, getState } 이다.
+let store = createStore(counterReducer)
+
+// subscribe() 의 파라미터로 store의 state가 변경될 때 실행될 listener를 전달할 수 있다.
+store.subscribe(() => console.log(store.getState()))
+
+store.dispatch({ type: 'counter/incremented' })
+// {value: 1}
+store.dispatch({ type: 'counter/incremented' })
+// {value: 2}
+store.dispatch({ type: 'counter/decremented' })
+// {value: 1}
+```
+
+간단하다. reducer를 바탕으로 store를 생성한다. 그리고 store는 현재 state 를 반환하는 `getState()` 와 action 을 dispatch하는 `dispatch()`, 그리고 state가 변경될 때 마다 실행될 함수를 전달하는 `subscribe()` 를 API로 노출한다.
+
+위 예시는 간단한 counter reducer를 만들고, store를 생성한 뒤 카운터 값이 변경될 때 마다 콘솔에 현재 카운터 값을 로깅하도록 한 것을 보여준다. 만약 이 store가 react-redux와 같은 툴을 통해 UI에 바인딩 되어있다면, `subscribe()` 에 `render()` 함수를 전달하여 state가 변경될 때 마다 re-render가 이뤄지도록 할 수 있다. 물론 Redux는 기본적으로 React와 같은 UI 라이브러리와 함께 쓰여야만 하는 도구가 아닌, pub-sub 패턴을 기반한 범용 state 컨테이너이다.
+
+> Redux is a predictable state container for JavaScript apps. - Redux Docs
+
+다시 코드를 보면, 핵심 API의 세부 구현은 `createStore`에 숨겨져있다. 지금부터 위 예시가 기존과 동일하게 잘 동작할 수 있게끔 `createStore`를 직접 구현해보자.
+
+## createStore
+
+우리가 노출해야 할 API는 총 3가지 이다.
+
+1. `getState()` - store의 현재 state를 반환한다
+2. `dispatch()` - action을 reducer에 전달한다
+3. `subscribe()` - state가 변경되면 실행할 함수를 전달한다
+
+먼저 `getState()` 함수를 구현해보자. 이때 `createStore()` 함수 scope에는 현재 reducer와 state가 존재한다. `getState()` 는 현재 state를 반환하기만 하면 된다.
+
+```js
+function createStore(reducer, initialState) {
+  let currentReducer = reducer
+  let currentState = initialState
+
+  return {
+    getState() {
+      return currentState
+    },
+  }
+}
+```
+
+다음으로 `dispatch()`를 구현하자. `dispatch()` 는 현재 reducer에 현재 state와 파라미터로 받은 action 을 전달하여 다음 state를 현재 state에 저장한다.
+
+```js
+function createStore(reducer, initialState) {
+  let currentReducer = reducer
+  let currentState = initialState
+
+  return {
+    getState() {
+      return currentState
+    },
+    dispatch(action) {
+      currentState = currentReducer(currentState, action)
+      return action
+    },
+  }
+}
+```
+
+마지막으로 `subscribe()`를 구현하자. `createStore()` 함수 scope에 현재 등록된 listeners를 참조하는 변수를 추가하고, `subscribe()` 에 전달된 리스너를 저장한다. 이 리스너는 `dispatch()` 가 호출되면 실행되도록 한다.
+
+```js
+function createStore(reducer, initialState) {
+  let currentReducer = reducer
+  let currentState = initialState
+  let listener = () => {}
+
+  return {
+    getState() {
+      return currentState
+    },
+    dispatch(action) {
+      currentState = currentReducer(currentState, action)
+      listener() // dispatch()가 호출되면 listener 함수가 실행된다
+      return action
+    },
+    subscribe(newListener) {
+      listener = newListener
+    },
+  }
+}
+```
+
+자, 이렇게 해서 아주 간단하면서 실제로 동작하는 `createStore` 를 만들었다. 맨 처음 소개한 예시코드에서 `createStore` 를 Redux가 아닌 우리가 구현한 걸로 바꾸어봐도 잘 동작하는 것을 확인할 수 있을 것이다.
+
+### Multiple Listeners
+
+만약 여러개의 listeners를 등록하고 싶다면 어떻게 해야할까. 이것도 역시 간단하다. `createStore` 함수 scope에 listeners를 담는 배열을 정의하고, `subscribe` 함수 파라미터로 전달된 listener를 배열에 저장한 뒤 `dispatch` 함수가 호출될 때 마다 이를 순회하여 모든 listener를 실행시켜주면 된다.
+
+```js
+function createStore(reducer, initialState) {
+  let currentReducer = reducer
+  let currentState = initialState
+  const listeners = []
+
+  return {
+    getState() {
+      return currentState
+    },
+    dispatch(action) {
+      currentState = currentReducer(currentState, action)
+      listeners.forEach((listener) => listener()) // 모든 리스너 실행
+      return action
+    },
+    subscribe(newListener) {
+      listeners.push(newListener)
+    },
+  }
+}
+```
+
+### Middlewares
+
+Redux에는 dispatch의 행위를 override하여 확장할 수 있는 미들웨어란 개념이 존재한다. 미들웨어는 다음과 같은 형태의 nested function이다.
+
+```js
+const anotherExampleMiddleware = (storeAPI) => (next) => (action) => {
+  // Do something in here, when each action is dispatched
+  return next(action)
+}
+```
+
+미들웨어가 이렇게 생긴 이유에 대해선 [이 블로그 포스팅](https://blog.eunsukim.me/posts/redux-middleware-deep-dive)을 참고하자. 이러한 미들웨어를 사용함으로써 우리는 dispatch pipeline을 직접 커스텀할 수 있다. 예를 들어, 아래와 같이 console에 로깅하고 에러가 발생하면 Sentry에 로깅하는 logger를 조합할 수 있다.
+
+```js
+import { createStore, applyMiddleware } from 'redux'
+const loggerMiddlewares = applyMiddleware(consoleLogger, errorLogger)
+const store = createStore(rootReducer, loggerMiddlewares)
+```
+
+자, 그러면 `createStore()` 가 미들웨어도 전달받을 수 있도록 함으로써 어떻게 미들웨어가 동작하는지 알아보자. 우선 `createStore()` 의 세 번째 파라미터로 middleware들이 포함된 배열 `middlewares`을 받도록 하자.
+
+```js
+function createStore(reducer, initialState, middlewares = []) {
+  /* ... */
+}
+```
+
+`middlewares` 의 각 미들웨어는 storeAPI(`getState`, `dispatch`)와 앞선 middleware에 의해 커스텀된 dispatch(여기서는 accumulated dispatch라는 의미로 `accDispatch` 라고 부르겠다)인 `next` 파라미터를 받아야 한다. 이를 우리 코드에서 전달해주자.
+
+```js
+function createStore(reducer, initialState, middlewares = []) {
+  let currentReducer = reducer
+  let currentState = initialState
+  const listeners = []
+
+  function getState() {
+    return currentState
+  }
+
+  const dispatch = (action) => {
+    currentState = currentReducer(currentState, action)
+    listeners.forEach((listener) => listener())
+    return action
+  }
+
+  /** 미들웨어에 의해 조합된 최종 dispatch에 대한 참조 **/
+  const lastDispatch = middlewares.reduce(
+    (accDispatch, middleware) => middleware({ getState, dispatch })(accDispatch), // 미들웨어에 storeAPI와 accDispatch를 커링 하여 전달한다
+    dispatch
+  )
+
+  function subscribe(newListener) {
+    listeners.push(newListener)
+  }
+
+  return {
+    getState,
+    dispatch: lastDispatch, // 최종적으로 반환하는 dispatch는 미들웨어에 의해 조합된 lastDispatch 이다
+    subscribe,
+  }
+}
+```
+
+여기서 한 가지 주의할 점은, `createStore`에 전달할 미들웨어의 순서는 호출 순서와 같을 것이기 때문에, 맨 마지막에있는 미들웨어가 호출하는 `dispatch` 가 실제 `store.dispatch` 를 호출할 수 있도록 전달받은 미들웨어의 순서를 바꾸어주자.
+
+```js
+const lastDispatch = middlewares
+  .reverse() // 미들웨어의 순서를 바꾸어서 맨 마지막 미들웨어가 store.dispatch를 받을 수 있도록 한다
+  .reduce((accDispatch, middleware) => middleware({ getState, dispatch })(accDispatch), dispatch)
+```
+
+이렇게 해서 미들웨어를 처리할 수 있게 되었다. 위에서 작성한 [예시 코드](#example)에 다음과 같이 `logger1`, `logger2` 를 추가한 뒤 실행해보면 미들웨어가 잘 동작하는 것을 확인할 수 있다
+
+```js
+// ... 생략
+const logger1 = (storAPI) => (next) => (action) => {
+  console.log('LOGGER1: dispatching', action)
+  return next(action)
+}
+
+const logger2 = (storAPI) => (next) => (action) => {
+  console.log('LOGGER2: dispatching', action)
+  return next(action)
+}
+
+// logger1, logger2 를 미들웨어로 전달한다
+let store = createStore(counterReducer, undefined, [logger1, logger2])
+store.subscribe(() => console.log(store.getState()))
+
+store.dispatch({ type: 'incremented' })
+//  LOGGER1: dispatching { type: 'incremented' }
+//  LOGGER2: dispatching { type: 'incremented' }
+// {value: 1}
+```
+
+## Recap
+
+지금까지 Redux, 정확히는 Redux에서 노출하는 `createStore` API가 어떻게 동작하는지 간단히 살펴보았다. 여기서 작성한 전체 코드는 [Github](https://github.com/eunsukimme/build-your-own-redux/tree/simple-redux)에서 확인할 수 있다. 물론 여기서 작성한 코드는 실제 Redux와 완전히 일치하진 않다. 실제로는 `createStore()` 에 [몇 가지 추가 필드](https://github.com/reduxjs/redux/blob/6b5f6f3147e639a20c9f0aa048bb04e371836b30/src/createStore.ts#L110)가 있으며 optimization이 적용되어 있다. 이는 [Redux Github](https://github.com/reduxjs/redux/blob/master/src/createStore.ts)에서 쉽게 확인할 수 있으니 참고하면 좋다.
+
+다음 포스팅에서는 Redux를 UI와 바인딩하여 어떻게 서로가 seamless하게 맞물려 동작하는지 확인하도록 하자.
+
+## References
+
+- https://redux.js.org/
+- https://blog.jakoblind.no/learn-redux-by-coding-a-mini-redux/
+- [tiny redux](https://gist.github.com/ibare/1ed63de0c09c94a7ac79713d57b80f8d)
+- [tiny redux - middlewares](https://gist.github.com/ibare/0eb8597551070bf1ebf8e797439913a3)
+- https://blog.eunsukim.me/posts/redux-middleware-deep-dive

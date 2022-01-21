@@ -1,0 +1,95 @@
+---
+title: CSS-in-JS는 왜 만들어졌나?
+summary: CSS가 가진 문제를 해결하기위해 만들어진 CSS-in-JS에 대해 알아봅시다
+date: '2021-09-26T21:30:00.000Z'
+draft: false
+slug: 'introducing-css-in-js'
+category: Frontend
+tags:
+  - Frontend
+  - CSS
+  - CSS-in-JS
+socialImage: '/media/css.png'
+---
+
+프론트엔드 개발자가 아니더라도 CSS-in-JS라는 용어는 익숙히 들어보았을 것이다. CSS-in-JS는 말 그대로 CSS를 JS코드 안에서 작성하는 개념을 지칭한다. CSS-in-JS를 구현한 라이브러리는 styled-components, emotion 등 여러가지가 있는데, 각 CSS-in-JS 라이브러리의 동작 세부 구현이나 API는 각기 다르지만 공통적으로 해결하고자 하는 문제들이 있다. 그 문제들을 해결하고자 CSS-in-JS란 개념이 등장하게 되었다. 이번 포스팅에서는 CSS-in-JS가 해결하고자 했던 진짜 문제가 무엇인지 알아보도록 하자.
+
+## 1. Global Namespace
+
+CSS는 global namespace를 갖는다. 즉, HTML document의 어떤 태그나 클래스라도 CSS의 selector가 될 수 있고, 하나의 CSS rule을 여러 element가 적용받을 수 있다. CSS는 처음부터 document를 스타일하기 위해 설계되었기 때문에 scope에 대한 개념이 없다. 그렇기 때문에 여러 CSS 방법론을 도입하여(ex. BEM, OOCSS, etc.) 이 문제를 해결하고자 하지만, 이중 어느것도 근본적인 문제를 해결해주지 못한다.
+
+### Solution
+
+CSS-in-JS는 style을 JS에서 정의하기 때문에 style variable이 lexical scope에 한정된다. 또 css는 모듈이란 개념이 없지만, CSS-in-JS는 style variable를 얼마든지 export/import 하여 재사용할 수 있다.
+
+아래 코드는 CSS-in-JS가 selector를 만드는 방법을 간단히 나타낸 것이다.
+
+```js
+const css = (styleBlock) => {
+  const className = someHash(styleBlock)
+  const styleEl = document.createElement('style')
+  styleEl.textContent = `
+    .${className} {
+      ${styleBlock}
+    }
+  `
+  document.head.appendChild(styleEl)
+  return className
+}
+
+const className = css(`
+  color: red;
+  padding: 20px;
+`) // 'c23j4'
+```
+
+## 2. Implicit Dependencies
+
+하나의 CSS rule은 여러 selector를 가지면서 서로 다른 HTML element에 적용될 수 있는데, 각 HTML element는 여러 className 또는 attribute를 가지면서 여러 CSS rule을 적용받을 수 있다. 이 의존 관계는 N:M 이다. 여기서 문제는 이 관계는 명시적이지 않기(Implicit) 때문에 개발자가 기억해야 한다는 것이다.
+
+### Solution
+
+CSS-in-JS는 이러한 의존 관계를 보다 명확하게 나타낼 수 있다. JS는 정적 분석이 가능하기 때문에 style variable이 참조하는 것이 무엇인지 바로 확인할 수 있다. 즉, CSS-in-JS는 HTML element와 CSS의 의존 관계를 개발자가 기억할 필요 없이 명확하게 만들어준다.
+
+## 3. Dead Code Elimination
+
+위에서 언급한 Implicit Dependency로 인해 어떤 CSS가 현재 사용되고 있는 것이고 사용되고 있지 않은 것(dead code)인지 파악하기 힘들다. 이러한 dead code는 웹 사이트 퍼포먼스에 안 좋은 영향을 미칠 수 있고, 유지보수를 어렵게 만든다.
+
+### Solution
+
+CSS-in-JS를 사용할 경우 linter 또는 minifier의 도움으로 현재 사용중이지 않은 style variable을 간단히 제거할 수 있다.
+
+## 4. Non-deterministic Resolution
+
+CSS rule은 specificity가 높은 것이 적용된다. 그런데 만약 같은 specificity를 가진다면, 뒤에 정의된 rule이 적용된다. 만약 같은 specificity를 갖는 CSS들을 async하게 불러오면 어떤 CSS rule이 적용될까? 답은 모른다. 이를 Non-deterministic Resolution이라고 한다.
+
+<figure class="video-container">
+  <img
+    width="821"
+    alt="Screen Shot 2021-09-26 at 10 58 40 PM"
+    src="https://user-images.githubusercontent.com/31213226/134811305-b4e7a6bc-6862-4875-9c55-ed483ee3b732.png"
+  />
+  <figcaption style={{ color: 'grey' }}>
+    Non-deterministic resolution(출처:
+    https://speakerdeck.com/reactamsterdam/oleg-slobodskoi-chatgrape-berlin-javascript-style-sheets)
+  </figcaption>
+</figure>
+
+### Solution
+
+이 문제를 해결하는 방법은 CSS-in-JS를 활용하여 HTML과 CSS를 강하게 결합시키는 것이다. 그리하여 각 HTML에서 사용될 CSS가 무엇인지 예상할 수 있도록 하는 것이다(deterministic).
+
+<hr />
+
+여기서 소개한 문제 이외에도 minification, sharing constant 등 CSS-in-JS가 해결할 수 있는 것들이 더 있다. 더 자세한 내용은 아래 첨부한 Reference를 찾아보면 좋을 것 같다.
+
+## Epilogue
+
+CSS-in-JS는 2014년 Facebook 개발자인 [Christopher Chedeau aka Vjeux 의 발표](http://blog.vjeux.com/2014/javascript/react-css-in-js-nationjs.html)에서 처음 소개된, 사실은 등장한지 얼마 되지 않은 개념이다. CSS-in-JS는 기존 CSS가 가진 문제를 해결하기 위해 탄생했고 오늘날 다양한 implementation들이 속속 나타나고 있다. 새로운 CSS-in-JS 프레임워크를 배우고 implementation details를 이해하는 것도 필요하지만, CSS-in-JS가 풀고자 했던 문제는 정확히 무엇인지를 제대로 알고 있다면 프레임워크 이해도를 높이고 앞으로 CSS-in-JS의 발전 방향을 예측할 수 있을 것이다. 나아가 문제를 해결하는 새로운 관점을 찾을 수 있지 않을까?
+
+## References
+
+- https://medium.com/dailyjs/what-is-actually-css-in-js-f2f529a2757
+- https://speakerdeck.com/vjeux/react-css-in-js
+- https://speakerdeck.com/reactamsterdam/oleg-slobodskoi-chatgrape-berlin-javascript-style-sheets
+- https://so-so.dev/web/css-in-js-whats-the-defference/

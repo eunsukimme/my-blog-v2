@@ -1,0 +1,112 @@
+---
+title: Accuracy(정확도), Recall(재현율), Precision(정밀도), 그리고 F1 Score
+summary: Machine Learning 모델의 성능을 측정하는 네 가지 지표에 대해서 알아봅시다
+date: '2019-10-21T03:00:00.000Z'
+draft: false
+slug: 'what-is-accuracy-recall-precision-and-f1-score'
+category: Machine Learning
+tags:
+  - TIL
+  - Machine Learning
+  - Python
+---
+
+Classification 을 할 수 있는 ML 알고리즘을 작성하였다면, 다음 단계는 해당 모델이 얼마나 잘 작동하는지 통계적으로 확인해보는 것입니다. 이러한 척도를 계산하는 공식에 대해서 알아봅시다.
+
+# Accuracy
+
+먼저 다음 피처를 활용하여 이번학기 성적이 B를 넘을지(1) 못 넘을지(0)를 예측하는 classifier를 작성하였다고 가정해봅시다.
+
+- 이번 주 공부한 시간
+- 이번 주 Netflix를 본 시간
+- 이번 주 잠든 시간
+- 시험 전 참석한 총 강의 시간
+
+가장 간단하게 성능을 측정하는 방법은 _accuracy(정확도)_ 를 계산하는 것입니다. **Accuracy는 올바르게 예측된 데이터의 수를 전체 데이터의 수로 나눈 값입니다**. 수식은 다음과 같습니다.
+
+$$\cfrac{True Positives + True Negatives}{True Positives + True Negatives + False Positives + False Negatives}$$
+
+각각의 term들이 성적 예측 classifier에서 의미하는 바가 무엇인지를 정리하면 다음과 같습니다.
+
+<img width="500" src="https://t1.daumcdn.net/cfile/tistory/99DC064C5BE056CE10" />
+
+- `True Positives` - 모델은 성적이 B보다 높을 것이라고 예측하였고 실제로 그런 경우
+- `True Negatives` - 모델은 성적이 B보다 낮을 것이라고 예측하였고 실제로 그런 경우
+- `False Positives` - 모델은 성적이 B보다 높을 것이라고 예측하였고 실제로는 아닌 경우
+- `False Negatives` - 모델은 성적이 B보다 낮을 것이라고 예측하였고 실제로는 아닌 경우
+
+# Recall
+
+위의 accuracy는 데이터에 따라 매우 잘못된 통계를 나타낼 수도 있습니다. 예를 들어, 내일 눈이 내릴지 아닐지를 예측하는 모델이 있다고 가정해 봅시다. 꽤 괜찮은 성능을 내는 모델을 작성할 수 있는데요, 바로 항상 `False` 로 예측하는 것입니다. 이 모델은 놀랍게도 굉장히 높은 accuracy를 갖습니다. 왜냐하면 눈이 내리는 날은 그리 많지 않기 때문이죠. 하지만 높은 accuracy를 보유함에도 불구하고 이 모델은 전혀 쓸모가 없습니다.
+
+이러한 상황에서 도움을 줄 수 있는 통계치는 바로 _recall(재현율)_ 입니다. **Recall은 실제로 True인 데이터를 모델이 True라고 인식한 데이터의 수입니다**. 위의 예시에서 recall은 모델이 눈이 내릴거라 예측한 날의 수를 실제로 눈이 내린 날의 수로 나눈 값입니다. 수식은 다음과 같습니다.
+
+$$\cfrac{True Positives}{True Positives + False Negatives}$$
+
+즉, 항상 `False` 라고 예측하기 때문에 정확도는 높지만 recall은 `0` 이 되버립니다.
+
+# Precision
+
+안타깝게도 recall도 완벽한 통계치는 아닙니다. 예를 들어, 위의 눈내림 예측기 예에서 이번에는 항상 `True` 로 예측한다고 가정해봅시다. 물론 accuracy는 낮겠지만, 모델이 모든 날을 눈이 내릴거라 예측하기 때문에 recall은 `1`이 되고 맙니다. 이 모델은 항상 `False` 로 예측하는 모델과 다를 바 없지만 높은 recall을 보유하게됩니다.
+
+이러한 상황에서 도움을 줄 수 있는 통계치는 바로 _precision(정밀도)_ 입니다. **Precision은 모델이 True로 예측한 데이터 중 실제로 True인 데이터이 수입니다**. 위의 예시에서 precision은 실제로 눈이 내린 날의 수를 모델이 눈이 내릴거라 예측한 날의 수로 나눈 값입니다. 수식은 다음과 같습니다.
+
+$$\cfrac{True Positives}{True Positives + False Positives}$$
+
+모델이 항상 눈이 내릴거라 예측하기 때문에 recall은 `1` 이지만, 실제로 눈이 내리는 날은 많지 않기 때문에 위 모델은 낮은 precision을 갖게 됩니다.
+
+**Note**: Precision과 recall은 서로 trade-off되는 관계가 있습니다.
+
+# F1 Score
+
+모델의 성능을 측정하는데 있어서 precision과 recall은 유용하게 사용됩니다. 그러나, 우리는 여전히 모델이 얼마나 효과적인지를 설명할 수 있는 한 가지 지표를 더 필요로합니다. 이 때 _F1 score_ 가 사용됩니다.
+
+**F1 score는 precision 과 recall의 조화평균입니다**. 수식은 다음과 같습니다.
+
+$$2 * \cfrac{Precision *  Recall}{Precision + Recall}$$
+
+F1 score는 precision과 recall을 조합하여 하나의 통계치를 반환합니다. 여기서 일반적인 평균이 아닌 조화 평균을 계산하였는데, 그 이유는 precision과 recall이 `0` 에 가까울수록 F1 score도 동일하게 낮은 값을 갖도록 하기 위함입니다.
+
+예를 들어, `recall = 1` 이고 `precision = 0.01` 로 측정된 모델이 있다고 생각해봅시다. 위 모델에는 분명 문제가 있다고 판단할 수 있는데요. precision이 매우 낮기 때문에 F1 score에도 영향을 미치게 됩니다. 만약 일반적인 평균을 구하면 다음과 같습니다.
+
+$$\cfrac{1 + 0.01}{2} = 0.505$$
+
+일반적으로 평균을 계산하면 높은 값이 나옵니다. 그러나 조화평균으로 계산하면 다음과 같은 결과를 얻습니다.
+
+$$2 * \cfrac{1 * 0.01}{1 + 0.01} = 0.019$$
+
+F1 score가 매우 낮게 계산된 것을 확인할 수 있습니다.
+
+# Scikit-Learn
+
+scikit-learn에서는 이러한 지표들을 계산하는 메서드를 제공하고 있습니다. `sklearn` 의 `metrics` 모듈로부터 `accuracy_score`, `recall_score`, `precision_score`, 그리고 `f1_score` 를 불러와 활용할 수 있습니다. 각 메서드는 파라미터로 실제 labels와 예측된 결과를 받아 통계치를 계산한 후 이를 반환합니다.
+
+```python
+from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
+
+labels = [1, 0, 0, 1, 1, 1, 0, 1, 1, 1]	# 실제 labels
+guesses = [0, 1, 1, 1, 1, 0, 1, 0, 1, 0]	# 에측된 결과
+
+print(accuracy_score(labels, guesses))	# 0.3
+print(recall_score(labels, guesses))	# 0.42
+print(precision_score(labels, guesses))	# 0.5
+print(f1_score(labels, guesses))	# 0.46
+```
+
+# Review
+
+지금까지 ML 모델의 성능을 측정하는 몇 가지 지표에 대해서 알아보았습니다. 이번 포스팅에서 배운 내용을 정리하면 다음과 같습니다.
+
+- Classifying a single point can result in a true positive (`truth = 1`, `guess = 1`), a true negative (`truth = 0`, `guess = 0`), a false positive (`truth = 0`, `guess = 1`), or a false negative (`truth = 1`, `guess = 0`).
+- Accuracy measures how many classifications your algorithm got correct out of every classification it made.
+- Recall measures the percentage of the relevant items your classifier was able to successfully find.
+- Precision measures the percentage of items your classifier found that were actually relevant.
+- Precision and recall are tied to each other. As one goes up, the other will go down.
+- F1 score is a combination of precision and recall.
+- F1 score will be low if either precision or recall is low.
+
+사실 이 지표들 중 에서 어떤 것을 써야 할지는 전적으로 모델의 맥락에 달려 있습니다. 만약 모델이 많은 false positives를 보유해도 상관이 없다면, 이러한 경우 precision은 별 의미가 없습니다. ML로 해결하려는 문제가 무엇인지를 정확하게 알면 알 수록 위 지표들 중 어떠한 것을 사용해야 할지를 결정할 수 있습니다.😋
+
+# References
+
+- [Codecademy](http://www.codecademy.com)

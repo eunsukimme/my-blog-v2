@@ -1,0 +1,76 @@
+---
+title: SSH Agent와 Agent Forwarding
+summary: private key 를 메모리에 저장하는 ssh agent 와 agent 를 forwarding 하는 방법에 대해 알아봅시다
+date: '2020-11-09T01:00:00.000Z'
+draft: false
+slug: 'ssh-agent-and-agent-forwarding'
+category: Linux
+tags:
+  - Linux
+  - shell
+  - ssh
+  - ssh-agent
+  - ssh-add
+socialImage: '/media/ssh-agent/ssh-agent.gif'
+---
+
+## ssh agent 란?
+
+- ssh agent 는 private key 를 메모리에 저장하는 프로그램입니다.
+
+- ssh agent 는 ssh client 에게 직접 private key 를 노출하지 않습니다.
+
+- ssh client 가 ssh 관련 operation 을 ssh agent 에게 요청하면, operation 은 ssh agent 에 의해 수행되고 그 결과 signature를 반환합니다.
+
+- ssh agent 에 private key 를 제공하는 명령은 `ssh-add -K <key_file>` 입니다.
+
+  ![https://docstore.mik.ua/orelly/networking_2ndEd/ssh/figs/ssh_0604.gif](https://docstore.mik.ua/orelly/networking_2ndEd/ssh/figs/ssh_0604.gif)
+
+**Note**: `-K` 옵션은 파라미터로 주어진 키를 macOS 키체인에 저장합니다.
+
+## ssh agent forwarding
+
+- ssh agent forwarding 은 local host(H) 상의 ssh agent 가 마치 remote host(B) 에 있는 것과 같이 접근할 수 있게 해줍니다. 그 결과 remote host(B) 의 ssh client 는 local host(H)에 있는 키를 활용할 수 있습니다. 아래 그림은 Bastion host(B) 에서 local host(H) 의 ssh agent 에 접근하여 working host(W) 에 ssh session 을 invoke 하는 것을 나타냅니다.
+
+  ![https://docstore.mik.ua/orelly/networking_2ndEd/ssh/figs/ssh_0606.gif](https://docstore.mik.ua/orelly/networking_2ndEd/ssh/figs/ssh_0606.gif)
+
+- Mac에서 ssh forwarding 은 `ssh -A ...` 명령으로 할 수 있습니다.
+
+### How ssh agent forward works
+
+ssh agent 포워딩은 아래 그림과 같은 과정으로 이루어집니다.
+
+![https://docstore.mik.ua/orelly/networking_2ndEd/ssh/figs/ssh_0607.gif](https://docstore.mik.ua/orelly/networking_2ndEd/ssh/figs/ssh_0607.gif)
+
+1. 머신 X 에서 Y 로 ssh connection을 생성하고자 아래 명령을 수행합니다.
+
+```sh
+# on machine X
+$ ssh Y
+```
+
+2. X 에서 ssh agent 포워딩이 설정되어 있다고 가정하고, ssh connection을 생성할 때 X 의 ssh client 는 Y 의 ssh server 에 `agent 포워딩 하려고 하는데 받아주라`"라고 요청합니다.
+3. Y 의 `sshd` 는 connection 설정을 확인하여 agent forwarding 이 실제로 permit 된 건지 확인합니다(여기서는 agent forwarding 이 enabled 되었다고 가정합시다).
+   **Note**: `sshd` 는 OpenSSH 서버 프로세스로, SSH 프로토콜을 사용하여 incomming connection 을 listen 하는 서버처럼 동작합니다. `sshd` 는 인증, 암호화, 터미널 연결, 파일 전송, 터널링을 핸들링합니다.
+4. Y의 `sshd` 는 Unix domain 소켓을 만들고 몇가지 환경 변수를 세팅함으로써 X와 Y 간의 `IPC(interprocess communication)` 채널을 생성합니다. 결과적으로는 하나의 ssh-agent 를 설정하는 것과 같아서, `sshd` 가 ssh agent 처럼 동작할 준비가 완료됩니다.
+5. X 와 Y 간의 SSH connection 이 생성됩니다.
+6. 다음으로 Y 에서 Z 와의 SSH connection 을 만들기 위해 아래 명령을 수행합니다.
+
+```sh
+# on machine Y
+$ ssh Z
+```
+
+7. Y 의 ssh client 는 Z 와 connection 을 맺기 위해 private key 를 필요로하는데, Y 에서 `sshd` 가 ssh-agent 인 것처럼 동작하고 있기 때문에 ssh client 는 agent IPC 채널을 통해 인증 요청을 만들게 됩니다.
+8. `sshd` 는 요청을 intercept 하고 ssh agent 인 것처럼 가장하며 "ㅎㅇ 내가 ssh agent 인데 뭐 필요한거 있어?"라고 ssh client 에게 말하면서 client 와 대화하게 됩니다.
+9. `sshd` 는 agent 와 관련된 요청을 다시 X에게 전달합니다. X 상의 ssh agent 는 해당 요청을 받아서 로컬에 저장된 키에 접근하고, 이에 상응하는 응답을 Y 상의 `sshd` 에게 전달합니다.
+10. Y 상의 `sshd` 는 해당 응답을 ssh client 에 전달하고 다시 Z 에 대한 연결이 진행됩니다.
+
+agent forwarding 을 활용하면 X 상의 SSH 키를 외부에 노출하지 않고 Y에서 투명하게 접근할 수 있습니다. 그리하여 Y 상의 ssh client 는 X 의 키에서 허용하는 모든 호스트에 접근할 수 있습니다. 이를 테스트하려면, Y 에서 `$ ssh-add -l` 명령을 실행해봅시다. X의 ssh-agent에 로드된 모든 키들을 확인할 수 있습니다.
+
+## References
+
+- https://docstore.mik.ua/orelly/networking_2ndEd/ssh/ch06_03.htm
+- https://docstore.mik.ua/orelly/networking_2ndEd/ssh/ch02_05.htm#ch02-86139.html
+- https://www.ssh.com/ssh/command/
+- https://www.ssh.com/ssh/sshd/

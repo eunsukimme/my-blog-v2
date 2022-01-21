@@ -1,0 +1,224 @@
+---
+title: Docker-ELK와 Filebeat, Node.js 로 로그 시스템 구축하기
+summary: Docker 를 활용하여 로컬 머신에 ELK 를 설치하고 Node.js 서버에서 생성한 로그를 ELK 로 전달하는 시스템을 구축하는 과정에 대해 알아봅시다.
+date: '2020-09-05T03:00:00.000Z'
+draft: false
+slug: 'build-logging-system-with-docker-elk-filebeat-nodejs'
+category: DevOps
+tags:
+  - DevOps
+  - Elasticsearch
+  - Logstash
+  - Kibana
+  - Filebeat
+  - Nodejs
+  - Docker
+socialImage: '/media/docker-elk/Diagram.png'
+---
+
+## ELK란?
+
+ELK란 ElasticSearch, Logstash, Kibana 등 Elastic 에서 제공하는 프로그램들로 구성된 시스템을 말합니다. ElasticSearch 는 로그를 저장하는 검색 엔진이고, Logstash 는 로그를 수집 및 정제하는 역할을 하며 Kibana 는 ElasticSearch 에 저장된 로그를 웹으로 시각화하는 도구입니다. 이 세 가지가 Elastic 의 주요 서비스로 위 서비스들의 이니셜 알파벳을 따서 ELK 라고 부릅니다. Elastic 에서는 ELK 외에 Beat 라는 데이터 전송 툴도 제공하고 있는데, 이번 포스팅에서는 (로그)파일 데이터를 전송하는 Filebeat 에 대해서도 다루어 보려고 합니다.
+
+ELK를 활용하면 로그 시스템에 필요한 정제 모듈, 시각화 모듈 등을 직접 구축하지 않아도 되기 때문에 웹 로그를 관리하는 작업을 보다 수월하게 진행할 수 있습니다. 이번 포스팅에서는 Docker 를 활용하여 로컬 머신에 ELK 를 설치하고 Node.js 서버에서 생성한 로그를 ELK 로 전달하는 시스템을 구축하는 과정에 대해 알아보겠습니다. 먼저 아키텍처 다이어그램은 다음과 같습니다.
+
+![/media/docker-elk/Diagram.png](/media/docker-elk/Diagram.png)
+
+전체적인 흐름을 설명하면, Node.js(Express) 서버는 HTTP request 를 기록하여 로그파일을 생성합니다. 이렇게 생성된 로그들은 호스트 머신의 Docker area 에 있는 볼륨에 저장됩니다. 저장된 로그를 Filebeat 라는 프로그램이 주기적으로 읽어서 Logstash 에게 전달하고, Logstash 를 Filebeat 로 부터 전달받은 로그를 정제한 뒤 Elasticsearch 에 전달합니다. Elasticsearch 는 전달받은 로그를 호스트 머신의 Docker area 에 있는 볼륨에 저장하고, Kibana 가 이를 필요로 할 때마다 전달해줍니다. 마지막으로 Kibana 는 어드민 사용자에게 로그 현황을 실시간으로 파악할 수 있는 대시보드를 제공합니다.
+
+각 서비스들은 모두 Dockerizing 되어 컨테이너로 생성되며 Node.js 서버는 디폴트 네트워크에, ELK 서비스들은 ELK 라는 이름의 네트워크에 연결되게 됩니다. 또 Node.js 서버와 Filebeat 는 로그가 저장되는 `log-data` 라는 named volume을 공유하고, Elasticsearch 는 Logstash 로부터 전달받은 로그를 저장하는 `elasticsearch` 라는 named volume 을 사용합니다.
+
+아키텍처 다이어그램을 살펴보았으니 이제 본격적으로 로그 시스템을 구축하도록 하겠습니다.
+
+## 1. Install ELK
+
+ELK 를 직접 호스트 머신에 설치할 수도 있지만, Docker 를 활용하면 편리하게 설치할 수 있습니다. [https://github.com/deviantony/docker-elk](https://github.com/deviantony/docker-elk) 이 레포지토리는 ELK 를 Dockerizing 하여 클론만으로 쉽게 설치할 수 있도록 템플릿을 제공하고 있습니다. 이 레포지토리를 클론해주세요.
+
+```jsx
+git clone https://github.com/deviantony/docker-elk
+cd docker-elk
+```
+
+해당 템플릿은 기본적인 설정이 이미 완료되어 있는데, 각 서비스들이 돌아가는 포트 번호와 디폴트 사용자 등이 정의되어 있습니다
+
+- Elasticsearch: 9200번 포트
+- Logstash: 5000번 포트
+- Kibana: 5601번 포트
+
+---
+
+## 2. Initial Setting
+
+클론한 폴더로 이동하면 ELK 각 서비스별로 폴더(`elasticsearch/`, `logstash/`, `kibana/`)가 생성된 것을 확인할 수 있습니다. 각 폴더에는 해당 서비스들을 설정할 수 있는 `config` 라는 폴더가 존재하는데, 여기에 위치한 YAML 파일을 변경해서 서비스 설정을 변경할 수 있습니다.
+
+각 서비스들에 대한 설정을 변경하기 전, 먼저 초기 설정을 진행해야 합니다. 맨 처음 클론을 받으면 user 가 다음과 같이 elasticsearch 의 superuser 격인 `elastic` 으로 설정되어 있습니다.
+
+- user: elastic
+- password: changeme
+
+이 user 와 패스워드를 사용해도 되지만 보안적인 문제가 발생할 수 있기 때문에 unprivileged 된 built-in 유저를 사용하고 비밀번호를 변경하는 것이 좋습니다. Elastic 이 제공하는 built-in 유저는 [공식 document](https://www.elastic.co/guide/en/elasticsearch/reference/current/built-in-users.html) 에서 확인할 수 있습니다.
+
+### Initialize Password
+
+패스워드를 실행하기 전 먼저 서비스들을 실행시켜 주어야 합니다.
+
+```yaml
+docker-compose up -d
+```
+
+다음으로 아래 명령을 실행해 built-in 유저의 패스워드를 초기화 해줍시다. 이 때 서비스들이 완전히 실행 되기까지 시간이 조금 필요하기 때문에 약간의 여유를 둔 뒤 실행시켜 줍시다.
+
+```jsx
+docker-compose exec -T elasticsearch bin/elasticsearch-setup-passwords auto --batch
+```
+
+그러면 elastic 을 포함한 총 7개의 built-in 유저의 패스워드가 랜덤하게 생성되어 콘솔에 출력되는데, 중요한 정보이므로 **반드시 안전한 곳에 기록해 두어야 합니다**. 이렇게 패스워드를 생성하였다면 `docker-compose.yml` 파일 내 `ELASTIC_PASSWORD` 환경변수는 삭제해주세요.
+
+### Replace Password
+
+각 서비스폴더 안의 `config` 폴더에 위치한 yml 파일을 수정해줍시다. `kibana/config/kibana.yml` 파일과 `logstash/config/logstash.yml` 파일의 `elastic` 유저를 각각 `kibana_system`, `logstash_system` 으로 변경하고 새롭게 생성한 패스워드를 제공해줍시다.
+
+`gist:eunsukimme/fdc47cbf1743e77932778ef5d227cf16#kibana.yml`
+
+`gist:eunsukimme/fdc47cbf1743e77932778ef5d227cf16#logstash.yml`
+
+또 logstash 의 경우 `pipeline` 폴더가 있는데, output 에서 `elastic` 유저의 패스워드도 새롭게 생성한 것으로 변경해주어야 합니다. 그리고 logstash 가 기존의 tcp 가 아닌 beat 로 부터 로그파일을 입력받도록 다음과 같이 `logstash/pipeline/logstash.conf` 파일에서 input 을 변경해주어야 합니다. 또 output 에 `test-log` 라는 이름의 `index` 를 설정해서 logstash 가 모든 로그를 하나의 인덱스로 인덱싱 하도록 하였습니다.
+
+`gist:eunsukimme/fdc47cbf1743e77932778ef5d227cf16#logstash-before.conf`
+
+**Note** `logstash.conf` 파일에 `logstash_system` 유저를 사용하면 안됩니다! 왜냐하면 인덱스를 생성할 수 있는 permission 이 없기 때문입니다. [Configuring Security in Logstash](https://www.elastic.co/guide/en/logstash/current/ls-security.html)를 참고하세요.
+
+### Restart Docker Container
+
+패스워드를 변경하였다면 logstash, kibana 서비스를 다시 시작해주세요.
+
+```jsx
+docker-compose restart kibana logstash
+```
+
+그러면 [localhost:5601](http://localhost:5601) 에서 kibana 가 돌아가고 있는데, 접속하면 로그인하라는 창이 나오게됩니다.
+
+![/media/docker-elk/Screen_Shot_2020-09-04_at_5.35.49_PM.png](/media/docker-elk/Screen_Shot_2020-09-04_at_5.35.49_PM.png)
+
+여기서 user는 `elastic` 으로 입력하고 패스워드는 이전에 새롭게 생성했던 `elastic` 유저의 패스워드를 입력하면 다음과 같이 대시보드에 접속하게 됩니다.
+
+![/media/docker-elk/Screen_Shot_2020-09-04_at_5.36.27_PM.png](/media/docker-elk/Screen_Shot_2020-09-04_at_5.36.27_PM.png)
+
+---
+
+## 3. Server Implementation
+
+이제 본격적으로 로그를 기록하는 Node.js 서버를 생성하고, 이를 ELK 에 전달하는 시스템을 구축해 보도록 하겠습니다. 먼저 `src` 폴더를 생성한 뒤 해당 폴더로 이동하고, `npm init` 으로 `packge.json` 파일을 생성하고 다음과 같이 `express`, `morgan`, `winston`, `winston-daily-rotate-file` 총 4개의 모듈을 추가해 줍시다.
+
+```yaml
+yarn init
+yarn add express morgan winston winston-daily-rotate-file
+```
+
+또한 ES6 의 `import` 키워드를 사용할 수 있도록 `type` 키 값을 `module` 로 설정해줍시다. 또 `start` 스크립트도 추가해줍시다.
+
+`gist:eunsukimme/fdc47cbf1743e77932778ef5d227cf16#package.json`
+
+다음으로 로그를 저장할 수 있도록 `winston` 라이브러리를 활용해서 다음과 같이 로그를 기록하는 `src/logger.js` 를 생성해줍시다. 이때 생성한 로그는 현재 날짜를 이름으로 하여 `src/logs/` 디렉토리에 저장됩니다. 저장된 로그들은 `winston-daily-rotate-file` 에 의해 최근 14일치 만이 남아있게됩니다.
+
+`gist:eunsukimme/fdc47cbf1743e77932778ef5d227cf16#logger.js`
+
+그리고 다음과 같이 `src/main.js`를 작성해서 express 서버를 생성하고, 조금 전 `src/logger.js` 에서 export 한 로깅 모듈을 가져와서 `morgan` 라이브러리의 stream 으로 등록해줍니다. 그리하여 express 서버로 들어온 요청을 logger 에게 전달하고, logger 는 이를 파일로 기록할 수 있도록 해줍시다.
+
+`gist:eunsukimme/fdc47cbf1743e77932778ef5d227cf16#main.js`
+
+**Note**: ES6 module 을 사용하면 `import` 로 불러오는 파일의 확장자(`*.js`)를 반드시 붙여주어야 합니다.
+
+`yarn start` 명령을 실행시키면 서버가 잘 돌아가는 것을 확인할 수 있습니다. 이렇게 생성한 서버를 Dockerizing 해서 나중에 docker compose 에 포함시킬 수 있도록 합시다. 다음과 같이 `src/Dockerfile` 을 생성해줍시다.
+
+`gist:eunsukimme/fdc47cbf1743e77932778ef5d227cf16#Dockerfile.app`
+
+자, 이렇게 해서 로깅을 위한 서버도 준비가 되었습니다. 마지막으로 morgan 에 의해 생성된 로그는 json 형태로 저장되는데, 이를 elasticsearch 에 저장할 수 있도록 필터링 하는 `filter` 부분을 input 과 output 사이에 추가해줍시다.
+
+`gist:eunsukimme/fdc47cbf1743e77932778ef5d227cf16#logstash-after.conf`
+
+**Note**: `grok`, `date` 는 logstash 가 지원하는 filter plugin 입니다. 각 플러그인에 대한 자세한 설명과 더 다양한 플러그인들은 [공식 document](https://www.elastic.co/guide/en/logstash/current/filter-plugins.html) 를 참고하세요.
+
+---
+
+## 4. Ship Logs(feat. Filebeat)
+
+이제 남은 작업은 서버에서 생성되는 로그를 ELK 로 전달하는 것입니다. Filebeat 가 바로 이 역할을 하는데요. Filebeat 는 앞서 말씀드렸다시피 elastic 에서 제작한 ELK 용 로그 전달 도구입니다. Filebeat 외에도 ELK 로 각종 데이터를 전달하는 도구들이 있는데, 이러한 서비스들을 Beat 라고 부릅니다. 어떤 Beat 들이 있는지는 [공식 repository](https://github.com/elastic/beats) 에서 확인할 수 있습니다.
+
+Filebeat 를 호스트 머신에 바로 설치할 수도 있지만, 여기서는 ELK 서비스와 마찬가지로 도커 이미지를 활용하도록 하겠습니다. 먼저 루트 디렉터리에 `filebeat` 란 폴더를 생성하고, 다음과 같이 `Dockerfile` 과 `filebeat.yml` 을 작성해주세요.
+
+`gist:eunsukimme/fdc47cbf1743e77932778ef5d227cf16#Dockerfile.filebeat`
+
+`gist:eunsukimme/fdc47cbf1743e77932778ef5d227cf16#filebeat.yml`
+
+`paths` 로 주어진 경로는 filebeat 컨테이너에서 로그 볼륨이 마운팅 될 디렉터리를 지정합니다. 이는 `docker-compose.yml` 에서 volume 을 설정함으로써 마운팅 할 수 있습니다. `docker-compose.yml` 의 services 영역 맨 아래에 두 서비스(`app`, `filebeat`)를 추가하고, volumes 영역에 `log-data` 를 추가해주세요.
+
+`gist:eunsukimme/fdc47cbf1743e77932778ef5d227cf16#docker-compose.yml`
+
+우리가 만든 서버 어플리케이션인 `app`, ELK 로 로그 파일을 전송할 `filebeat` 란 새로운 서비스를 정의하였습니다. 각 폴더에 있는 Dockerfile 을 참조하여 빌드되도록 하였고, `log-data` 란 볼륨을 공유하도록 하였습니다. 여기서 중요한 것은 `filebeat` 가 `elk` 네트워크를 공유하도록 하여서 `logstash` 서비스에 접근할 수 있도록 해야합니다. 마지막으로 클론한 상태의 logstash 서비스는 포트가 tcp, udp 만 열려있기 때문에 `docker-cmopose` 에서 logstash 의 포트를 `5000:5000` 으로 변경해주면 됩니다.
+
+---
+
+## 5. Run Test
+
+자, 이제 모든 준비가 완료되었으니 모든 서비스들을 실행시켜 테스트를 진행해봅시다.
+
+```yaml
+docker-compose up -d --build --force-recreate
+```
+
+브라우저를 열고 [http://localhost:4000](http://localhost:4000) 에 접속하면 다음과 같이 응답을 전달받는 것을 확인할 수 있습니다.
+
+![/media/docker-elk/Screen_Shot_2020-09-02_at_3.19.08_PM.png](/media/docker-elk/Screen_Shot_2020-09-02_at_3.19.08_PM.png)
+
+요청이 잘 전달되었으니, 실제로 로그가 filebeat 에 의해 logstash 에 전달되고 elasticsearch 에 잘 저장되었는지 kibana 에서 이를 확인해볼까요? [http://localhost:5601](http://localhost:5601) 에 접속해서 `elastic` 유저로 로그인한 뒤 왼쪽 메뉴 버튼을 누른 뒤 키바나의 `Discover` 탭을 클릭해주세요.
+
+![/media/docker-elk/Screen_Shot_2020-09-04_at_5.50.56_PM.png](/media/docker-elk/Screen_Shot_2020-09-04_at_5.50.56_PM.png)
+
+그러면 `Create Index Pattern` 페이지가 보이면서 우리가 `logstash.conf` 에 정의했던 index 가 나타나게 됩니다.
+
+![/media/docker-elk/Screen_Shot_2020-09-04_at_5.53.44_PM.png](/media/docker-elk/Screen_Shot_2020-09-04_at_5.53.44_PM.png)
+
+이번 포스팅에서는 하나의 인덱스를 다루고 있어서 하나밖에 보이지 않지만, 실제론 여러개의 인덱스를 생성할 수 있고 지금 보여지는 페이지에서 인덱스들을 조합하여 하나의 인덱스 패턴을 생성할 수 있습니다. 그리하여 대시보드에서 특정 인덱스 패턴에 포함된 로그들을 시각화하여 볼 수 있습니다.
+
+이번 포스팅에서는 `*log*` 라는 이름으로 패턴을 생성하여, "log" 가 포함된 모든 인덱스를 조합하는 패턴을 생성하도록 하겠습니다. `index pattern` 에 `*log*` 를 입력하고 `Next step` 버튼을 클릭하세요.
+
+![/media/docker-elk/Screen_Shot_2020-09-04_at_5.54.22_PM.png](/media/docker-elk/Screen_Shot_2020-09-04_at_5.54.22_PM.png)
+
+다음으로 time filter 를 설정해서 기준 시간을 세울 수 있습니다. 즉, 로그가 어느 시점에 들어왔는지를 설정할 수 있는데, `@timestamp` 로 설정하면 logstash 에 의해 전달된 시간이 로그가 생성된 시점으로 여겨지게 됩니다. 그러나 이는 엣날에 생성한 로그를 가져올 때 문제가 될 수 있습니다. 그래서 여기서는 morgan 에 의해 생성되었고 logstash 에 의해 json 필드에 담겨진 타임스탬프인 `parseJson.timestamp` 로 설정하도록 하겠습니다.
+
+![/media/docker-elk/Screen_Shot_2020-09-04_at_5.59.58_PM.png](/media/docker-elk/Screen_Shot_2020-09-04_at_5.59.58_PM.png)
+
+이를 완료하면 하나의 인덱스 패턴이 생성되고, 다음과 같이 해당 인덱스 패턴에 대한 자세한 정보를 확인할 수 있는 페이지로 넘어갑니다.
+
+![/media/docker-elk/Screen_Shot_2020-09-04_at_6.00.41_PM.png](/media/docker-elk/Screen_Shot_2020-09-04_at_6.00.41_PM.png)
+
+자, 이제 다시 키바나의 Discover 탭을 선택해볼까요? 그러면 다음과 같이 로그가 들어오는 것을 막대그래프로 확인할 수 있습니다. 한 번 접속했기 때문에 로그도 하나만 측정되었습니다.
+
+![/media/docker-elk/Screen_Shot_2020-09-04_at_6.02.27_PM.png](/media/docker-elk/Screen_Shot_2020-09-04_at_6.02.27_PM.png)
+
+[http://localhost:4000](http://localhost:4000) 에 여러번 접속을 시도해볼까요? 접속할 때 마다 요청은 express 서버에 전달되어 morgan 에 의해 로그로 기록되게 되고, 이를 filebeat 가 logstash 에게 전달하여 elasticsearch 에 저장되게 됩니다. 그리고 kibana 에서는 다음과 같이 이를 실시간으로 확인할 수 있게 됩니다.
+
+![/media/docker-elk/Screen_Shot_2020-09-04_at_6.06.24_PM.png](/media/docker-elk/Screen_Shot_2020-09-04_at_6.06.24_PM.png)
+
+막대그래프 아래의 각 로그 왼쪽의 꺽쇠 기호를 클릭하면 해당 로그에 포함된 필드들을 확인할 수 있습니다. 여기선 `logstash.conf` 에 `grok` 플러그인을 사용하여 `parseJson.message` 에서 `IPv6`, `IPv4`, `timestamp`, `verb`, `url`, `http version`, `status code` 를 추출하였는데 아래와 같이 로그 오브젝트 루트 필드에 해당 값들이 추가된 것을 확인할 수 있습니다.
+
+![/media/docker-elk/Screen_Shot_2020-09-04_at_6.07.45_PM.png](/media/docker-elk/Screen_Shot_2020-09-04_at_6.07.45_PM.png)
+
+---
+
+## Recap
+
+지금까지 Docker-elk 와 filebeat, Node.js 를 활용하여 로그 시스템을 구축하는 과정에 대해 살펴보았습니다. 이번 포스팅에서는 웹 서버와 ELK 서버가 같은 호스트 머신에서 돌아가고 있지만, 호스트 머신을 분리하여 운용할 수도 있으며 logstash가 log를 elasticsearch 에 저장할 때 여러 인덱스를 생성하여 각 용도에 맞는 인덱스 패턴을 생성할 수도 있습니다. 또한 여기서는 다루지 않았지만 docker-elk 에는 `curator` 라는 extension 이 포함되어 있는데, 이 extension 을 활용하면 주기적으로 elasticsearch 에 저장되는 로그를 삭제 및 백업시킬 수 있습니다. 활용도가 높은 ELK 스택, 앞으로도 많이 활용해볼 수 있으면 좋겠습니다😀.
+
+## References
+
+- [deviantony/docker-elk](https://github.com/deviantony/docker-elk)
+
+- [Built-in users | Elasticsearch Reference [7.9] | Elastic](https://www.elastic.co/guide/en/elasticsearch/reference/current/built-in-users.html)
+
+- [Configuring Security in Logstash | Logstash Reference [7.9] | Elastic](https://www.elastic.co/guide/en/logstash/current/ls-security.html)
+
+- [elastic/beats](https://github.com/elastic/beats)
+
+- [Filter plugins](https://www.elastic.co/guide/en/logstash/current/filter-plugins.html)

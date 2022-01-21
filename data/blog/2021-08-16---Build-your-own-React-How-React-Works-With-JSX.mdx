@@ -1,0 +1,249 @@
+---
+title: Build your own React - React는 어떻게 JSX를 활용하나?
+summary: JSX가 DOM element로 해석되는 방식과 React가 JSX를 활용하여 DOM tree를 그리는 과정에 대해 알아봅시다.
+date: '2021-08-16T23:50:00.000Z'
+draft: false
+slug: 'how-react-works-with-jsx'
+category: Frontend
+tags:
+  - Frontend
+  - React
+  - JSX
+  - Babel
+socialImage: '/media/react.png'
+---
+
+> 이 포스팅은 AUSG 5기 Frontend Deep Dive 스터디에서 [Build your own React](https://pomb.us/build-your-own-react/) 포스팅을 읽고 학습한 내용을 기록한 것입니다. 원문 내용에 더해 React 동작 원리를 이해하는데 도움이 되는 내용이 포함되어 있습니다. 글의 내용과 관련한 피드백은 언제나 환영합니다.
+
+## JSX
+
+```jsx
+const element = <h1>Hello, world!</h1>
+```
+
+JSX는 JS확장 문법이다. JSX를 활용하면 JS파일에 마크업을 포함시킬 수 있는데, 브라우저는 JSX를 해석할 수 없기 때문에, 배포 전 Babel 과 같은 빌드 툴을 활용하여 JS로 트랜스파일 해주어야 한다.
+
+Babel을 사용하면 [@babel/plugin-transform-react-jsx](https://babeljs.io/docs/en/babel-plugin-transform-react-jsx/) 플러그인을 활용하여 JSX를 두 가지 방식으로 트랜스파일 할 수 있는데, 첫 번째로 `React.createElement(...)` 를 호출하도록 변환하는 전통적인 방식(classic runtime)과 `react/jsx-runtime` 패키지를 import 하여 해당 패키지에서 헬퍼 함수를 가져와 호출하도록 변환하는 새로운 방식(automatic runtime)이 있다. 두 가지 트랜스파일 방식을 제공하는 이유는 react가 17버전 부터 [새로운 JSX transform](https://reactjs.org/blog/2020/09/22/introducing-the-new-jsx-transform.html) 을 도입했기 때문인데, 그 이유는 [여기](https://github.com/reactjs/rfcs/blob/createlement-rfc/text/0000-create-element-changes.md#motivation)에서 소개된 문제들을 해결하기 위함으로 이는 여기서 다루고자 하는 내용의 범위를 벗어나기 때문에 다른 포스팅에서 다루도록 하곘다.
+
+Typescript 환경에서 JSX(TSX)를 작성하는 경우 tsconfig.json 의 [jsx 컴파일러 옵션](https://www.typescriptlang.org/tsconfig#jsx)을 정의하여 트랜스파일 방식을 선택할 수 있다. 디폴트는 Babel의 classic runtime과 동일하게 `React.createElement(...)` 를 호출하는 방식(`"react"`)이다. Babel의 automatic runtime과 같이 새로운 JSX transform을 적용하려면 `"react-jsx"` 를 적용할 수 있다. Typescript의 경우 type check만 하고 트랜스파일링은 Babel과 같은 도구에 위임할 수 있도록 JSX를 변환하지 않는 옵션(`"preserve"`)도 제공한다. 더 자세한 내용은 [공식 문서](https://www.typescriptlang.org/docs/handbook/jsx.html)에서 살펴볼 수 있다.
+
+**Note**: 앞으로 다루게 될 내용에서 JSX는 Babel의 classic runtime에서와 같이 `React.createElement(...)`로 변환된다고 가정한다.
+
+JSX 트랜스파일 과정에 대한 이해를 돕기 위해 예를 들어 다음과 같은 JSX가 있다고 생각해보자.
+
+```jsx
+const element = <h1 className="greeting">Hello, world!</h1>
+```
+
+이 element는 Babel에 의해 다음과 같이 트랜스파일 된다([babel repl](https://babeljs.io/repl/#?browsers=&build=&builtIns=false&corejs=3.6&spec=false&loose=false&code_lz=MYewdgzgLgBApgGzgWzmWBeGAKAUDGAHgAsBGGYBAQwggDkrUMAiAcwCc44oBLMV5gD58BGAAlECEABoYAdxDsEAEwCEIwgHoywgJQBuIA&debug=false&forceAllTransforms=false&shippedProposals=false&circleciRepo=&evaluate=false&fileSize=false&timeTravel=false&sourceType=module&lineWrap=true&presets=react&prettier=false&targets=&version=7.15.3&externalPlugins=&assumptions=%7B%7D) 에서 테스트할 수 있다).
+
+```js
+const element = /*#__PURE__*/ React.createElement('h1', { className: 'greeting' }, 'Hello, world!')
+```
+
+`React.createElement` 의 arguments 로 전달된 것들을 자세히보면, element 태그의 `type`, `props`, `children` 이 순서대로 전달된 것을 확인할 수 있다. 이 코드를 실행하면 `React.createElement` 함수는 다음과 같은 [오브젝트를 반환](https://ko.reactjs.org/docs/introducing-jsx.html#jsx-represents-objects)한다.
+
+```js
+const element = {
+  type: 'h1',
+  props: {
+    className: 'greeting',
+    children: 'Hello, world!',
+  },
+}
+```
+
+함수 호출 결과로 반환된 오브젝트는 `type`, `props` 키를 포함한다(사실은 `ref`, `key` 등 같이 [더 많은 키를 포함](https://github.com/facebook/react/blob/f4cc45ce962adc9f307690e1d5cfa28a288418eb/packages/react/src/ReactElement.js#L111)하지만, 여기서는 이 두 가지 키만 다루도록 한다). `type` 은 DOM 노드의 타입을 명시하고 `props` 에는 JSX에 전달된 모든 key-value 가 포함되며 `children` 이란 특수한 키를 포함한다. 여기서는 `children` 이 string인데 실제로는 여러 element를 포함하는 배열인 경우가 많다.
+
+## Step Zero: Review
+
+JSX가 어떻게 트랜스파일 되는지 살펴보았으니, 지금부터 React가 어떻게 JSX를 활용하는지 알아보도록 하자. 먼저 아래 간단한 예시를 통해 React코드를 vanilla JS로 변환하면서 React, JSX, DOM element가 어떻게 동작하는지 살펴보자.
+
+```jsx
+const element = <h1 title="foo">Hello</h1>
+const container = document.getElementById('root')
+ReactDOM.render(element, container)
+```
+
+위 코드에 포함된 JSX는 Babel에 의해 트랜스파일되어 `React.createElement(...)` 로 표현되고, 최종적으로 다음과 같은 오브젝트로 변환된다.
+
+```js
+const element = {
+  type: 'h1',
+  props: {
+    title: 'foo',
+    children: 'Hello',
+  },
+}
+```
+
+다음으로 수정할 코드는 `ReactDOM.render(...)` 로, 이 함수는 argument로 주어진 element를 container에 마운트 시키는 기능을 한다. 이 함수를 간단한 vanilla JS코드로 바꾸면 다음과 같다.
+
+```js
+// const element = { ... }
+const container = document.getElementById('root')
+
+const node = document.createElement(element.type)
+node['title'] = element.props.title
+const text = document.createTextNode('')
+text['nodeValue'] = element.props.children
+
+node.appendChild(text)
+container.appendChild(node)
+```
+
+먼저 element의 type에 맞는 DOM 노드(`node`)를 생성하고, element의 props를 노드의 attribute로 적용한다. 그리고 element의 children에 해당되는 노드(`text`)를 생성하는데, 이 경우 `"Hello"` 라는 string이기 때문에 textNode를 생성하고 해당 노드의 `nodeValue` attribute로 전달한다. 최종적으로 `text` 를 `node` 에 append하고 다시 `node`를 `container`에 append하면 DOM tree가 완성된다.
+
+**Note**: children을 다룰 때 노드의 `innerText` 를 수정하지 않고 textNode를 생성하는 이유는 앞으로 다룰 element들에 대해 같은 방식을 적용하기 위함이다.
+
+**Note**: 용어를 보다 명확히 하기 위해 "element"는 React element를, "node"는 DOM element를 지칭한다고 가정한다.
+
+이렇게해서 JSX가 DOM element로 만들어지기까지의 대략적인 과정을 살펴보았다. 지금까지는 JSX가 어떻게 해석되는지 이해하는데 초점을 맞추었다면, 지금부터는 React의 동작 원리에 초점을 맞춰서, React에서 제공하는 API들이 내부적으로 어떻게 돌아가는지 알아보도록 하자.
+
+## Step I: The `createElement` Function
+
+React의 `createElement` 함수는 `type`, `props`, `children` 을 arguments로 받아서 React element( `type`, `props` 키를 가진 오브젝트)을 return하는 함수라는 것을 알았으니, 이 함수를 직접 만들어보자. 먼저 다음과 같은 JSX를 가정하자.
+
+```jsx
+const element = (
+  <div id="foo">
+    <a>bar</a>
+    <b />
+  </div>
+)
+```
+
+위 JSX는 다음과 같이 트랜스파일된다.
+
+```js
+const element = React.createElement(
+  'div',
+  { id: 'foo' },
+  React.createElement('a', null, 'bar'),
+  React.createElement('b')
+)
+```
+
+div 태그의 자식으로 a, b태그가 있는데, children이 여러개인 경우 `React.createElement` 함수의 argument로 element의 type, props 그리고 children(배열)이 차례로 전달된다. 이 함수를 직접 작성해보면 다음과 같다.
+
+```js
+function createElement(type, props, ...children) {
+  return {
+    type,
+    props: {
+      ...props,
+      children: children.map((child) =>
+        typeof child === 'object' ? child : createTextElement(child)
+      ),
+    },
+  }
+}
+```
+
+이때 children의 각 요소는 React elements 혹은 primitive value가 될 수 있는데, primitive value인 경우 특수한 type(`"TEXT_ELEMENT"`)을 갖는 wrapper element를 반환하도록 `createTextElement` 함수를 만들어주자.
+
+```js
+function createTextElement(text) {
+  return {
+    type: 'TEXT_ELEMENT',
+    props: {
+      nodeValue: text,
+      children: [],
+    },
+  }
+}
+```
+
+**Note**: 실제로 React는 primitive value를 wrapping 하거나 빈 children 배열을 만들지 않지만, 여기서는 코드를 단순하게 만들기 위해 이처럼 하였다.
+
+자 이제 Babel이 JSX를 트랜스파일할 때 `React.createElement` 가 아닌 우리가 작성한 `createElement` 를 호출하도록 변경해주면 된다. 먼저 우리가 작성한 라이브러리를 `Didact` 라고 이름을 지어주고, 다음과 같이 JSX가 위치한 파일에 주석을 달아주자.
+
+```jsx
+/** @jsx Didact.createElement */
+const Didact = {
+  createElement,
+}
+const element = (
+  <div id="foo">
+    <a>bar</a>
+    <b />
+  </div>
+)
+```
+
+Babel을 사용하는 경우 JSX가 위치한 파일에 `/** @jsx ... */` 주석을 달아주면 [Babel이 해당 JSX를 트랜스파일할 때 React가 아닌 주석에 정의된 라이브러리를 사용](https://babeljs.io/docs/en/babel-plugin-transform-react-jsx/#customizing-the-classic-runtime-import)한다.
+
+## Step II: The `render` Function
+
+이제 `ReactDOM.render` 함수를 직접 만들어보자. 지금은 DOM update, delete는 무시하고 일단 DOM 트리에 추가하는 기능만 생각하자. 먼저 `render` 함수의 윤곽을 잡아보자.
+
+```js
+function render(element, container) {
+  // DOM 노드를 element type에 맞게 생성한다
+  const dom = document.createElement(element.type)
+  // children DOM 노드를 생성한다
+  element.props.children.forEach((child) => render(child, dom))
+  // element를 컨테이너에 append 한다
+  container.appendChild(dom)
+}
+
+const Didact = {
+  createElement,
+  render,
+}
+```
+
+먼저 element의 type에 맞는 DOM 노드를 생성하고, 이 노드를 container에 추가해야한다. 그리고 element의 children에 대해서 이를 반복해야 한다. 이때 element의 type이 `"TEXT_ELEMENT"` 인 경우를 핸들링 해준다.
+
+```js
+const dom =
+  element.type == 'TEXT_ELEMENT'
+    ? document.createTextNode('')
+    : document.createElement(element.type)
+```
+
+마지막으로 element의 props를 DOM 노드의 attribute로 전달하기만 하면 된다.
+
+```js
+function render(element, container) {
+  const dom =
+    element.type == 'TEXT_ELEMENT'
+      ? document.createTextNode('')
+      : document.createElement(element.type)
+  // children을 제외한 props를 DOM attribute로 전달한다
+  const isProperty = (key) => key !== 'children'
+  Object.keys(element.props)
+    .filter(isProperty)
+    .forEach((name) => {
+      dom[name] = element.props[name]
+    })
+
+  element.props.children.forEach((child) => render(child, dom))
+  container.appendChild(dom)
+}
+```
+
+이렇게 하면 이제 JSX를 React가 아닌 우리가 작성한 라이브러리로 렌더링할 수 있게 된다.
+
+```js
+const container = document.getElementById('root')
+Didact.render(element, container)
+```
+
+동작하는 소스코드는 [codesandbox](https://codesandbox.io/s/didact-2custom-createelement-and-render-4811e?file=/src/index.js)와 [Github 레포지토리](https://github.com/eunsukimme/Didact-Playground/tree/chapter02)에서 확인할 수 있다.
+
+## Recap
+
+지금까지 JSX가 DOM element로 해석되는 방식과 React가 JSX를 활용하여 DOM tree를 만드는 과정에 대해 살펴보았다. 여기서 다룬 내용을 정리해보면 다음과 같다.
+
+- JSX는 Babel과 같은 빌드 툴에 의해 JS로 트랜스파일 되고 기본적으로 React API를 호출하도록 변환된다.
+- `React.createElement(...)` 함수는 `type`, `props`, `children` 을 argument로 받아 `type`, `props` 를 키로 갖는 React element를 반환한다.
+- JSX 코드에 `/** @jsx ... */` 주석을 적어놓으면 Babel이 트랜스파일 할 때 React가 아닌 해당 라이브러리에서 제공하는 API를 호출하도록 변환한다.
+
+## References
+
+- [Build your own react](https://pomb.us/build-your-own-react/)
+- [JSX](https://ko.reactjs.org/docs/introducing-jsx.html)
+- [@babel/plugin-transform-react-jsx](https://babeljs.io/docs/en/babel-plugin-transform-react-jsx/)
+- [React 17 new JSX transform](https://reactjs.org/blog/2020/09/22/introducing-the-new-jsx-transform.html)
+- [tsconfig.json - jsx](https://www.typescriptlang.org/tsconfig#jsx)
