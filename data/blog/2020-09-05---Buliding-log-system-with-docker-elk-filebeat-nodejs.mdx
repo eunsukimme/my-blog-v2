@@ -13,7 +13,7 @@ tags:
   - Filebeat
   - Nodejs
   - Docker
-socialImage: '/media/docker-elk/Diagram.png'
+socialImage: '/static/media/docker-elk/Diagram.png'
 ---
 
 ## ELK란?
@@ -22,7 +22,7 @@ ELK란 ElasticSearch, Logstash, Kibana 등 Elastic 에서 제공하는 프로그
 
 ELK를 활용하면 로그 시스템에 필요한 정제 모듈, 시각화 모듈 등을 직접 구축하지 않아도 되기 때문에 웹 로그를 관리하는 작업을 보다 수월하게 진행할 수 있습니다. 이번 포스팅에서는 Docker 를 활용하여 로컬 머신에 ELK 를 설치하고 Node.js 서버에서 생성한 로그를 ELK 로 전달하는 시스템을 구축하는 과정에 대해 알아보겠습니다. 먼저 아키텍처 다이어그램은 다음과 같습니다.
 
-![/media/docker-elk/Diagram.png](/media/docker-elk/Diagram.png)
+![/static/media/docker-elk/Diagram.png](/static/media/docker-elk/Diagram.png)
 
 전체적인 흐름을 설명하면, Node.js(Express) 서버는 HTTP request 를 기록하여 로그파일을 생성합니다. 이렇게 생성된 로그들은 호스트 머신의 Docker area 에 있는 볼륨에 저장됩니다. 저장된 로그를 Filebeat 라는 프로그램이 주기적으로 읽어서 Logstash 에게 전달하고, Logstash 를 Filebeat 로 부터 전달받은 로그를 정제한 뒤 Elasticsearch 에 전달합니다. Elasticsearch 는 전달받은 로그를 호스트 머신의 Docker area 에 있는 볼륨에 저장하고, Kibana 가 이를 필요로 할 때마다 전달해줍니다. 마지막으로 Kibana 는 어드민 사용자에게 로그 현황을 실시간으로 파악할 수 있는 대시보드를 제공합니다.
 
@@ -98,11 +98,11 @@ docker-compose restart kibana logstash
 
 그러면 [localhost:5601](http://localhost:5601) 에서 kibana 가 돌아가고 있는데, 접속하면 로그인하라는 창이 나오게됩니다.
 
-![/media/docker-elk/Screen_Shot_2020-09-04_at_5.35.49_PM.png](/media/docker-elk/Screen_Shot_2020-09-04_at_5.35.49_PM.png)
+![/static/media/docker-elk/Screen_Shot_2020-09-04_at_5.35.49_PM.png](/static/media/docker-elk/Screen_Shot_2020-09-04_at_5.35.49_PM.png)
 
 여기서 user는 `elastic` 으로 입력하고 패스워드는 이전에 새롭게 생성했던 `elastic` 유저의 패스워드를 입력하면 다음과 같이 대시보드에 접속하게 됩니다.
 
-![/media/docker-elk/Screen_Shot_2020-09-04_at_5.36.27_PM.png](/media/docker-elk/Screen_Shot_2020-09-04_at_5.36.27_PM.png)
+![/static/media/docker-elk/Screen_Shot_2020-09-04_at_5.36.27_PM.png](/static/media/docker-elk/Screen_Shot_2020-09-04_at_5.36.27_PM.png)
 
 ---
 
@@ -169,41 +169,41 @@ docker-compose up -d --build --force-recreate
 
 브라우저를 열고 [http://localhost:4000](http://localhost:4000) 에 접속하면 다음과 같이 응답을 전달받는 것을 확인할 수 있습니다.
 
-![/media/docker-elk/Screen_Shot_2020-09-02_at_3.19.08_PM.png](/media/docker-elk/Screen_Shot_2020-09-02_at_3.19.08_PM.png)
+![/static/media/docker-elk/Screen_Shot_2020-09-02_at_3.19.08_PM.png](/static/media/docker-elk/Screen_Shot_2020-09-02_at_3.19.08_PM.png)
 
 요청이 잘 전달되었으니, 실제로 로그가 filebeat 에 의해 logstash 에 전달되고 elasticsearch 에 잘 저장되었는지 kibana 에서 이를 확인해볼까요? [http://localhost:5601](http://localhost:5601) 에 접속해서 `elastic` 유저로 로그인한 뒤 왼쪽 메뉴 버튼을 누른 뒤 키바나의 `Discover` 탭을 클릭해주세요.
 
-![/media/docker-elk/Screen_Shot_2020-09-04_at_5.50.56_PM.png](/media/docker-elk/Screen_Shot_2020-09-04_at_5.50.56_PM.png)
+![/static/media/docker-elk/Screen_Shot_2020-09-04_at_5.50.56_PM.png](/static/media/docker-elk/Screen_Shot_2020-09-04_at_5.50.56_PM.png)
 
 그러면 `Create Index Pattern` 페이지가 보이면서 우리가 `logstash.conf` 에 정의했던 index 가 나타나게 됩니다.
 
-![/media/docker-elk/Screen_Shot_2020-09-04_at_5.53.44_PM.png](/media/docker-elk/Screen_Shot_2020-09-04_at_5.53.44_PM.png)
+![/static/media/docker-elk/Screen_Shot_2020-09-04_at_5.53.44_PM.png](/static/media/docker-elk/Screen_Shot_2020-09-04_at_5.53.44_PM.png)
 
 이번 포스팅에서는 하나의 인덱스를 다루고 있어서 하나밖에 보이지 않지만, 실제론 여러개의 인덱스를 생성할 수 있고 지금 보여지는 페이지에서 인덱스들을 조합하여 하나의 인덱스 패턴을 생성할 수 있습니다. 그리하여 대시보드에서 특정 인덱스 패턴에 포함된 로그들을 시각화하여 볼 수 있습니다.
 
 이번 포스팅에서는 `*log*` 라는 이름으로 패턴을 생성하여, "log" 가 포함된 모든 인덱스를 조합하는 패턴을 생성하도록 하겠습니다. `index pattern` 에 `*log*` 를 입력하고 `Next step` 버튼을 클릭하세요.
 
-![/media/docker-elk/Screen_Shot_2020-09-04_at_5.54.22_PM.png](/media/docker-elk/Screen_Shot_2020-09-04_at_5.54.22_PM.png)
+![/static/media/docker-elk/Screen_Shot_2020-09-04_at_5.54.22_PM.png](/static/media/docker-elk/Screen_Shot_2020-09-04_at_5.54.22_PM.png)
 
 다음으로 time filter 를 설정해서 기준 시간을 세울 수 있습니다. 즉, 로그가 어느 시점에 들어왔는지를 설정할 수 있는데, `@timestamp` 로 설정하면 logstash 에 의해 전달된 시간이 로그가 생성된 시점으로 여겨지게 됩니다. 그러나 이는 엣날에 생성한 로그를 가져올 때 문제가 될 수 있습니다. 그래서 여기서는 morgan 에 의해 생성되었고 logstash 에 의해 json 필드에 담겨진 타임스탬프인 `parseJson.timestamp` 로 설정하도록 하겠습니다.
 
-![/media/docker-elk/Screen_Shot_2020-09-04_at_5.59.58_PM.png](/media/docker-elk/Screen_Shot_2020-09-04_at_5.59.58_PM.png)
+![/static/media/docker-elk/Screen_Shot_2020-09-04_at_5.59.58_PM.png](/static/media/docker-elk/Screen_Shot_2020-09-04_at_5.59.58_PM.png)
 
 이를 완료하면 하나의 인덱스 패턴이 생성되고, 다음과 같이 해당 인덱스 패턴에 대한 자세한 정보를 확인할 수 있는 페이지로 넘어갑니다.
 
-![/media/docker-elk/Screen_Shot_2020-09-04_at_6.00.41_PM.png](/media/docker-elk/Screen_Shot_2020-09-04_at_6.00.41_PM.png)
+![/static/media/docker-elk/Screen_Shot_2020-09-04_at_6.00.41_PM.png](/static/media/docker-elk/Screen_Shot_2020-09-04_at_6.00.41_PM.png)
 
 자, 이제 다시 키바나의 Discover 탭을 선택해볼까요? 그러면 다음과 같이 로그가 들어오는 것을 막대그래프로 확인할 수 있습니다. 한 번 접속했기 때문에 로그도 하나만 측정되었습니다.
 
-![/media/docker-elk/Screen_Shot_2020-09-04_at_6.02.27_PM.png](/media/docker-elk/Screen_Shot_2020-09-04_at_6.02.27_PM.png)
+![/static/media/docker-elk/Screen_Shot_2020-09-04_at_6.02.27_PM.png](/static/media/docker-elk/Screen_Shot_2020-09-04_at_6.02.27_PM.png)
 
 [http://localhost:4000](http://localhost:4000) 에 여러번 접속을 시도해볼까요? 접속할 때 마다 요청은 express 서버에 전달되어 morgan 에 의해 로그로 기록되게 되고, 이를 filebeat 가 logstash 에게 전달하여 elasticsearch 에 저장되게 됩니다. 그리고 kibana 에서는 다음과 같이 이를 실시간으로 확인할 수 있게 됩니다.
 
-![/media/docker-elk/Screen_Shot_2020-09-04_at_6.06.24_PM.png](/media/docker-elk/Screen_Shot_2020-09-04_at_6.06.24_PM.png)
+![/static/media/docker-elk/Screen_Shot_2020-09-04_at_6.06.24_PM.png](/static/media/docker-elk/Screen_Shot_2020-09-04_at_6.06.24_PM.png)
 
 막대그래프 아래의 각 로그 왼쪽의 꺽쇠 기호를 클릭하면 해당 로그에 포함된 필드들을 확인할 수 있습니다. 여기선 `logstash.conf` 에 `grok` 플러그인을 사용하여 `parseJson.message` 에서 `IPv6`, `IPv4`, `timestamp`, `verb`, `url`, `http version`, `status code` 를 추출하였는데 아래와 같이 로그 오브젝트 루트 필드에 해당 값들이 추가된 것을 확인할 수 있습니다.
 
-![/media/docker-elk/Screen_Shot_2020-09-04_at_6.07.45_PM.png](/media/docker-elk/Screen_Shot_2020-09-04_at_6.07.45_PM.png)
+![/static/media/docker-elk/Screen_Shot_2020-09-04_at_6.07.45_PM.png](/static/media/docker-elk/Screen_Shot_2020-09-04_at_6.07.45_PM.png)
 
 ---
 

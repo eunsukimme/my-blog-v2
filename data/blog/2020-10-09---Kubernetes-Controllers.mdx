@@ -10,7 +10,7 @@ tags:
   - Kubernetes
   - Docker
   - Controller
-socialImage: '/media/kubernetes.png'
+socialImage: '/static/media/kubernetes.png'
 ---
 
 이번 포스팅에서는 노드가 다운되면 포드를 자동으로 다시 스케줄링하여 포드를 안정적으로 유지하는 컨트롤러에 대해서 알아보겠습니다. 또 수평으로 포드를 스케일링하고 배치 작업을 한 번 또는 주기적으로 실행하는 방법에 대해서도 알아보겠습니다.
@@ -66,7 +66,7 @@ Liveness: http-get http://:8080/ delay=0s timeout=1s period=10s #success=1 #fail
 아래 그림은 노드1이 다운된 경우 레플케이션 컨트롤러가 노드 2에 포드를 복제하는 것을 보여주고 있습니다. 포드 A 는 레플리케이션 컨트롤러에 의해 관리되지 않기 때문에 복제되지 않고, 포드 B는 레플리케이션 컨트롤러에 의해 관리되고 있어서 노드2에 복제됩니다.
 
 <figure>
-  <img src="/media/kubernetes_controller/replication_controller.jpg" alt="" width="600" />
+  <img src="/static/media/kubernetes_controller/replication_controller.jpg" alt="" width="600" />
   <figcaption style={{ color: 'grey' }}>레플리케이션 컨트롤러 동작원리</figcaption>
 </figure>
 
@@ -154,7 +154,7 @@ spec:
 이처럼 모든 클러스터 노드에서 포드를 실행하려면 데몬셋(Demon Set)객체를 만들어야 합니다. 데몬셋은 위에서 언급한 컨트롤러들과 비슷합니다. 단, 데몬셋에 의해 만들어진 포드는 이미 대상 노드가 지정되있기 때문에, 쿠버네티스 스케줄러를 건너 뛴다는 차이가 있습니다. 아래 그림과 같이 데몬셋은 노드가 있는 수 만큼 포드를 생성하고 각 노드에 포드를 하나씩 배포합니다.
 
 <figure>
-  <img src="/media/kubernetes_controller/demonset.jpg" alt="" width="700" />
+  <img src="/static/media/kubernetes_controller/demonset.jpg" alt="" width="700" />
   <figcaption style={{ color: 'grey' }}>레플리카셋과 데몬셋의 동작 비교</figcaption>
 </figure>
 

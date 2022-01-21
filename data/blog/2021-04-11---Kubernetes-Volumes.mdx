@@ -10,7 +10,7 @@ tags:
   - Kubernetes
   - Docker
   - Volume
-socialImage: '/media/kubernetes.png'
+socialImage: '/static/media/kubernetes.png'
 ---
 
 쿠버네티스 파드 내에서 돌아가는 컨테이너는 고유한 파일 시스템을 갖습니다. 파일 시스템은 컨테이너 이미지에서 제공되기 때문입니다. 그렇기 때문에 컨테이너가 재시작하게 되면 이전에 컨테이너에서 쓰여진 파일시스템은 새롭게 시작된 컨테이너가 볼 수 없습니다. 만약 컨테이너가 종료되더라도 파일시스템이 유지되도록 하고 싶다면 어떻게 하면 좋을까요?
@@ -24,7 +24,7 @@ socialImage: '/media/kubernetes.png'
 볼륨의 동작을 보다 쉽게 이해하기 위해 어떤 파드에 Web Server, Content Agent, Log Rotator 기능을 하는 컨테이너 3개가 존재한다고 가정해봅시다. Web Server는 `/var/htdocs` 디렉터리에 HTML 페이지를 서빙하고 `/var/logs` 에 액세스 로그를 기록합니다. Content Agent는 Web Server가 서빙할 HTML 파일을 `/var/html` 에 생성합니다. Log Rotator는 `/var/logs` 디렉터리의 로그를 처리합니다. 이 컨테이너들이 서로의 파일 시스템을 공유할 수 있게 다음과 같이 `publicHTML`, `logVol` 두 볼륨을 추가할 수 있습니다.
 
 <figure>
-  <img src="/media/kubernetes_volume/1.jpeg" />
+  <img src="/static/media/kubernetes_volume/1.jpeg" />
   <figcaption style={{ color: 'grey' }}>
     두 개의 볼륨을 공유하고 각 경로에 마운트한 컨테이너
   </figcaption>
@@ -112,7 +112,7 @@ volumes:
 `hostPath` 볼륨은 노드의 파일시스템의 특정 파일이나 디렉터리를 가리킵니다. 이 볼륨을 사용하면 파드 내 컨테이너 간 데이터를 공유할 수 있을 뿐만 아니라 같은 노드에 실행중인 파드 사이에서도 같은 파일 시스템을 공유할 수 있습니다.
 
 <figure>
-  <img src="/media/kubernetes_volume/2.jpeg" />
+  <img src="/static/media/kubernetes_volume/2.jpeg" />
   <figcaption style={{ color: 'grey' }}>hostPath 볼륨을 사용하는 상황</figcaption>
 </figure>
 
@@ -165,7 +165,7 @@ spec:
 위 디스크립터로 생성한 파드는 GCE 퍼시스턴트 디스크를 기반으로 한 단일 볼륨과 단일 컨테이너로 이뤄집니다.
 
 <figure>
-  <img src="/media/kubernetes_volume/3.jpeg" />
+  <img src="/static/media/kubernetes_volume/3.jpeg" />
   <figcaption style={{ color: 'grey' }}>
     GCE 퍼시스턴트 디스크를 참조하는 볼륨을 마운트하는 파드
   </figcaption>
@@ -186,7 +186,7 @@ spec:
 퍼시스턴트볼륨(PV)과 퍼시스턴트클레임(PVC)을 보다 쉽게 이해하기 위해 아래 그림을 먼저 보겠습니다.
 
 <figure>
-  <img src="/media/kubernetes_volume/4.jpeg" />
+  <img src="/static/media/kubernetes_volume/4.jpeg" />
   <figcaption style={{ color: 'grey' }}>
     관리자와 개발자가 퍼시스턴트볼륨 및 퍼시스턴트클레임을 활용하는 다이어그램
   </figcaption>
@@ -300,7 +300,7 @@ spec:
 위 파드 디스크립터를 게시하여 PVC를 참조하는 볼륨을 컨테이너에 마운트하는 파드를 생성하면, 이전에 파드 디스크립터에 gcePersistentDisk 를 직접 기술해서 생성했던 것과 동일하게 동작합니다. 그러나 PV와 PVC가 연결되는 구조가 생겼단 점에서 차이가 있는데요, 달라진 상황을 비교하는 그림은 다음과 같습니다.
 
 <figure>
-  <img src="/media/kubernetes_volume/5.jpeg" />
+  <img src="/static/media/kubernetes_volume/5.jpeg" />
   <figcaption style={{ color: 'grey' }}>
     퍼시스턴트 스토리지를 직접 사용하는 방식과 PV 및 PVC를 사용하는 방식의 차이
   </figcaption>
@@ -315,7 +315,7 @@ spec:
 만약 PV를 수동으로 다시 클레임하려면 PV를 삭제하고 다시 생성해야 합니다. 이 경우 기반 스토리지 파일을 어떻게 할지 결정해야 하는데, 삭제할 수도 있고 다음 파드에서 다시 사용하도록 남겨둘 수도 있습니다. 만약 PV가 리클레임 정책으로 `Delete` 를 지원한다면 자동으로 기반 스토리지를 삭제할 수 있습니다.
 
 <figure>
-  <img src="/media/kubernetes_volume/6.jpeg" />
+  <img src="/static/media/kubernetes_volume/6.jpeg" />
   <figcaption style={{ color: 'grey' }}>PV, PVC 그리고 파드의 수명 주기</figcaption>
 </figure>
 
@@ -376,7 +376,7 @@ spec:
 파드에 퍼시스턴트 스토리지를 연결하는 최적의 방법은 바로 SC를 명시적으로 지정한 PVC와 파드를 생성하는 것 이란 걸 알게 되었습니다. PV와 실제 스토리지를 생성하는 것은 관리자와 개발자가 아닌 전적으로 프로비저너의 역할인 것입니다. 동적 프로비저닝된 PV를 가져오는 것을 포함한 전체 그림은 다음과 같습니다.
 
 <figure>
-  <img src="/media/kubernetes_volume/7.jpeg" />
+  <img src="/static/media/kubernetes_volume/7.jpeg" />
   <figcaption style={{ color: 'grey' }}>PV 동적 프로비저닝 워크플로우</figcaption>
 </figure>
 

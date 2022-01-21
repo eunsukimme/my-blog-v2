@@ -13,7 +13,7 @@ tags:
   - S3
   - IAM
   - CodeBuild
-socialImage: '/media/react_s3_codebuild/codebuild.png'
+socialImage: '/static/media/react_s3_codebuild/codebuild.png'
 ---
 
 이번 포스팅에서는 AWS S3, IAM 그리고 CodeBuild 를 활용하여 Github 에 저장된 React Application 의 CI/CD 파이프라인을 구축하는 방법에 대해 알아보도록 하겠습니다. 포스팅에 앞서 이미 React App 이 Github remote repository 에 등록되어 있다고 가정하도록 하겠습니다.
@@ -24,43 +24,43 @@ socialImage: '/media/react_s3_codebuild/codebuild.png'
 
 먼저 빌드된 React 파일을 호스팅 할 S3 버킷을 생성해줍니다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.33.45_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.33.45_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.33.45_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.33.45_PM.png)
 
 원하는 이름으로 버킷을 만들어줍시다. 여기서는 `lovo-s3-codebuild` 라고 하였습니다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.35.14_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.35.14_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.35.14_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.35.14_PM.png)
 
 다음으로 Properties 에서는 아무 설정을 하지 않고 넘어가줍시다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.35.53_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.35.53_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.35.53_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.35.53_PM.png)
 
 이 버킷은 Public Access 가 가능하여야 하므로 `Block all public access` 체크박스를 해제해준 뒤 넘어가줍시다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.36.13_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.36.13_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.36.13_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.36.13_PM.png)
 
 마지막으로 `Create Bucket` 버튼을 누르면 버킷이 생성됩니다. 이렇게 만들어진 버킷을 클릭해봅시다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.38.01_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.38.01_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.38.01_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.38.01_PM.png)
 
 ### 1-2. Setting to Host Website
 
 `Properties` 탭을 선택합니다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.38.48_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.38.48_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.38.48_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.38.48_PM.png)
 
 `Static website hosting` 이 현재 `Disabled` 되있다고 나타나는데, 이를 클릭해서 `Enable` 되도록 해줍시다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.39.03_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.39.03_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.39.03_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.39.03_PM.png)
 
 이때 `Use this bucket to host a website` 란 옵션을 선택하고, `Index document` 와 `Error Document` 를 모두 `index.html` 로 설정해줍시다. Error Document 도 동일하게 설정하는 이유는 React App 은 SPA(Single Page Application) 이므로 Error page 를 개발자가 커스텀하게 만들어주기 위함입니다.
 
 여기서는 중요하지 않으니 다음으로 넘어가줍시다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.39.24_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.39.24_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.39.24_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.39.24_PM.png)
 
 `Properties` 오른쪽에 있는 `Permission` 탭은 선택합니다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.41.08_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.41.08_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.41.08_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.41.08_PM.png)
 
 여기서는 버킷의 Policy 를 정의할 수 있는데, 아래의 코드를 복사한 뒤 붙여넣어 주세요. 아래 코드는 현재 S3 버킷에 존재하는 모든 오브젝트에 공개적으로 읽기 권한을 부여합니다. 그런 다음 `<YOUR_BUCKET_NAME>` 부분을 위에서 생성한 버킷의 이름으로 변경해주면 됩니다.
 
@@ -79,7 +79,7 @@ socialImage: '/media/react_s3_codebuild/codebuild.png'
 }
 ```
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.42.32_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.42.32_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.42.32_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.42.32_PM.png)
 
 자, 이렇게 해서 번들링 된 React App 을 호스팅 할 버킷이 생성되었습니다.
 
@@ -89,19 +89,19 @@ socialImage: '/media/react_s3_codebuild/codebuild.png'
 
 CodeBuild 를 활용하면 조금 전 생성한 버킷에 access 해야하는데, 이를 허용하도록 IAM Role 을 만들어 줍시다. 먼저 IAM 서비스에서 `Create role` 버튼을 클릭하여 새로운 Role 을 만들어줍시다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.49.00_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.49.00_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.49.00_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.49.00_PM.png)
 
 유스케이스로 `CodeBuild` 를 선택하고 다음으로 넘어가 줍시다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.51.40_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.51.40_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.51.40_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.51.40_PM.png)
 
 `s3fullaccess` 로 검색하고, 해당 Policy 를 선택한 다음 다음으로 넘어갑시다. 그러면 태그를 설정할 수 있는데 바로 여기서는 바로 넘어가도록 하겠습니다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.53.36_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.53.36_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.53.36_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.53.36_PM.png)
 
 마지막으로 Role 의 이름을 설정하면 됩니다. 여기서는 `ReactS3CodeBuildRole` 이라고 간단하게 정의했습니다. 오른쪽 아래 `Create role` 버튼을 눌러서 IAM Role 생성을 완료해줍시다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.54.20_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.54.20_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.54.20_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.54.20_PM.png)
 
 ---
 
@@ -113,11 +113,11 @@ S3 버킷도 만들고 IAM Role 도 생성 했으니 이제 본격적으로 Code
 
 먼저 CodeBuild 서비스에서 `Create build project` 를 클릭해서 새로운 빌드 프로젝트를 만들어 줍시다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.43.31_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.43.31_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.43.31_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.43.31_PM.png)
 
 제일 먼저 프로젝트 이름을 설정할 수 있습니다. 여기서는 `React-S3-CodeBuild` 라고 이름을 지었습니다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.44.09_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.44.09_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.44.09_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.44.09_PM.png)
 
 ### Source
 
@@ -125,7 +125,7 @@ S3 버킷도 만들고 IAM Role 도 생성 했으니 이제 본격적으로 Code
 
 그리고 `Github repository` 는 사전에 React App 이 등록된 repository 를 선택해 주면 됩니다. 다음으로 `Source version` 으로 어떤 브랜치의 코드를 가져올 것인지 설정해줄 수 있습니다. 여기서는 master 브랜치의 코드를 가져오도록 하도록 설정했습니다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.24.24_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.24.24_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.24.24_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.24.24_PM.png)
 
 ### Primary source webhook events
 
@@ -133,17 +133,17 @@ Source 를 개인 Github account 로 선택하게 되면 아래와 같이 `Prima
 
 저는 master 브랜치에서 이벤트가 발생할때만 빌드가 되도록 하기 위해서 `HEAD_REF` 값으로 `refs/heads/master` 를 주었습니다. 또 master 브랜치에 푸쉬를 하거나 PR 이 merge 가 될 때만 빌드가 될 수 있도록 하기 위해 `Event type` 으로 `PUSH`, `PULL_REQUEST_MERGED` 를 주었습니다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.25.37_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.25.37_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.25.37_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.25.37_PM.png)
 
 ### Environment
 
 다음으로 프로젝트를 빌드하기 위해 프로비저닝 할 환경을 설정할 수 있습니다. 이때 프로비저닝에 활용될 도커 이미지로 AWS 에서 제공하는 이미지를 사용할 수도 있고 Docker Hub 에 저장된 개인적인 이미지도 활용할 수 있습니다. 여기선 `Operation system` 은 `Amazon Linux 2` 로 설정해주고, `Runtime` 은 `Standard` 로, `Image` 는 `aws/codebuild/amazonlinux2-aarch64-standard:2.0` 으로 설정해주고 `Image version` 은 `Always use the latest image for this runtime version` 으로 설정해 주겠습니다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.56.13_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.56.13_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.56.13_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.56.13_PM.png)
 
 또 `Environment` 에서 `Service role` 을 선택할 수 있는데, 여기서 조금 전에 생성한 IAM Role 을 선택해주면 됩니다. 빌드한 React 아티팩트를 S3 에 올려야 해서 IAM Role 이 필요하기 때문이죠.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.57.11_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.57.11_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.57.11_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_6.57.11_PM.png)
 
 ### Buildspec
 
@@ -151,11 +151,11 @@ Source 를 개인 Github account 로 선택하게 되면 아래와 같이 `Prima
 
 CodeBuild 는 기본적으로 프로젝트 root 디렉토리에서 `buildspec.yml` 이란 파일을 스펙 파일로 사용합니다. 그렇기 때문에 따로 스펙 파일 이름을 정의하지 않아도 되지만, 여러 환경으로 빌드해야 할 경우 스펙 파일을 다르게 정의할 수도 있는 걸 보여드리기 위해 다음과 같이 `buildspec.production.yml` 이라고 스펙 파일 이름을 정의해보겠습니다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.01.47_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.01.47_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.01.47_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.01.47_PM.png)
 
 자, 멀고도 멀었던 CodeBuild 설정이 완료되었습니다. 이제 맨 아래 `Create build project` 버튼을 클릭해서 CodeBuild 프로젝트를 생성해줍시다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.02.07_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.02.07_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.02.07_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.02.07_PM.png)
 
 ---
 
@@ -214,17 +214,17 @@ artifacts:
 
 AWS CodeBuild 서비스에 들어가보면 조금 전 생성한 빌드 프로젝트가 돌아가고 있는 것을 확인할 수 있습니다(Latest build status 가 `In progress` 로 변경되어 있음). 해당 빌드 프로젝트를 선택하면 현재까지 진행된 빌드 히스토리를 확인할 수 있습니다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.30.25_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.30.25_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.30.25_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.30.25_PM.png)
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.30.43_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.30.43_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.30.43_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.30.43_PM.png)
 
 빌드 프로젝트 상세 페이지에서 현재 빌드가 어떤 phase 에 있고, 로그는 어떻게 나오는지도 확인할 수 있습니다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.31.31_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.31.31_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.31.31_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.31.31_PM.png)
 
 빌드가 성공적으로 이뤄졌다면 S3 주소에 접속했을 때 다음과 같이 React App 이 잘 호스팅 된 것을 확인할 수 있습니다.
 
-![/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.37.48_PM.png](/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.37.48_PM.png)
+![/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.37.48_PM.png](/static/media/react_s3_codebuild/Screen_Shot_2020-08-18_at_7.37.48_PM.png)
 
 ---
 

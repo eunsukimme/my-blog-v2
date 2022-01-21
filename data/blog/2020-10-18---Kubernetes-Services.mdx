@@ -10,7 +10,7 @@ tags:
   - Kubernetes
   - Docker
   - Service
-socialImage: '/media/kubernetes.png'
+socialImage: '/static/media/kubernetes.png'
 ---
 
 포드가 다른 곳에서 제공하는 서비스를 사용하려면 다른 포드를 찾을 방법이 필요합니다. 그러나 클라이언트가 서비스를 제공하는 서버의 IP 주소나 호스트 이름을 지정하는 일반적인 애플리케이션과 달리 쿠버네티스에선 포드가 일회성이라 언제든지 이동하거나 사라질 수 있기 때문에 포드를 연결하기 위한 단일 진입 점이 필요합니다.
@@ -38,7 +38,7 @@ spec:
 위 디스크립터에 의해 생성된 서비스는 80 포트로 들어오는 연결을 허용하고 `app=kubia` 라벨 셀렉터에 매칭되는 포드 중 하나를 http(여기서는 8080) 포트로 라우팅합니다. 이렇게 생성된 서비스는 `CLUSTER_IP` 라는 클러스터 안에서만 유효한 내부 IP 를 할당받게 됩니다. 그리하여 `app=kubia` 란 라벨이 붙은 포드에 `exec` 명령을 실행하여 curl 로 서비스에 요청을 보내면 동일한 라벨이 붙은 포드로 전달되어 응답을 받는 것을 확인할 수 있습니다.
 
 <figure>
-  <img src="/media/kubernetes_service/service.jpeg" alt="" width="800" />
+  <img src="/static/media/kubernetes_service/service.jpeg" alt="" width="800" />
   <figcaption style={{ color: 'grey' }}>서비스 동작 과정</figcaption>
 </figure>
 
@@ -133,7 +133,7 @@ subsets:
 위 디스크립터로 엔드포인트가 생성되면 서비스가 생성된 후 만들어진 포드는 서비스의 환경변수가 포함될 것이고 컨테이너의 모든 IP 와 포트 쌍으로의 연결은 서비스 엔드포인트 간에 로드밸런싱 될 것입니다. 아래 그림은 그러한 과정을 나타내고 있습니다.
 
 <figure>
-  <img src="/media/kubernetes_service/endoint.jpeg" alt="" width="700" />
+  <img src="/static/media/kubernetes_service/endoint.jpeg" alt="" width="700" />
   <figcaption style={{ color: 'grey' }}>엔드포인트를 통해 외부로 요청을 보내는 서비스</figcaption>
 </figure>
 
@@ -171,7 +171,7 @@ spec:
 위 서비스를 생성하면 서비스의 IP 를 통해 액세스도 되고 노드의 IP 와 노드포트를 통해서도 액세스 가능합니다. minikube 의 경우 minikube 노드의 IP 주소와 nodePort 로 로컬 머신에서 요청을 보내면 응답을 받을 수 있습니다.
 
 <figure>
-  <img src="/media/kubernetes_service/nodeport.jpeg" alt="" width="700" />
+  <img src="/static/media/kubernetes_service/nodeport.jpeg" alt="" width="700" />
   <figcaption style={{ color: 'grey' }}>노드포트로 서비스를 외부와 연결한 상태</figcaption>
 </figure>
 
@@ -200,7 +200,7 @@ spec:
 로드밸런서는 nodePort 를 지정할 필요가 없습니다. 노드로 라우팅 하는 것은 쿠버네티스가 선택합니다.
 
 <figure>
-  <img src="/media/kubernetes_service/loadbalancer.jpeg" alt="" width="700" />
+  <img src="/static/media/kubernetes_service/loadbalancer.jpeg" alt="" width="700" />
   <figcaption style={{ color: 'grey' }}>로드밸런서로 서비스를 외부와 연결한 상태</figcaption>
 </figure>
 
@@ -213,7 +213,7 @@ spec:
 각 LoadBalancer 서비스는 그 자신만의 공개 IP 를 갖는 자체 로드밸런서를 필요로 하는 반면, 인그레스는 수십 개의 서비스에 대한 액세스를 제공할 때도 하나의 IP만 필요로 하기 때문입니다. 다음 그림과 같이 클라이언트가 HTTP 요청을 인그레스에 보내면 호스트와 요청 상의 경로로 포워딩 될 서비스를 결정됩니다.
 
 <figure>
-  <img src="/media/kubernetes_service/ingress.jpeg" alt="" width="740" />
+  <img src="/static/media/kubernetes_service/ingress.jpeg" alt="" width="740" />
   <figcaption style={{ color: 'grey' }}>하나의 인그레스로 여러 서비스를 노출시킨 상태</figcaption>
 </figure>
 
@@ -264,7 +264,7 @@ You've hit kubia-cbjc7
 클러스터 외부 클라이언트는 처음에 [kubia.example.com](http://kubia.example.com) 에 대해 DNS 룩업을 수행하고, DNS 서버(minikube 의 경우 로컬 머신)는 인그레스 컨트롤러의 IP 주소를 반환합니다. 그런 다음 클라이언트는 HTTP 요청을 인그레스 컨트롤러로 보내고 Host 헤더에 kubia.example.com 을 지정합니다. 이 헤더에서 컨트롤러는 클라이언트가 액세스 하려고 하는 서비스를 결정하고 서비스와 연관된 엔드포인트 객체를 통해 포드 IP 를 조회한 클라이언트 요청을 포드 중 하나로 전달합니다. 즉, 인그레스 컨트롤러는 요청을 서비스로 전달하지 않고 오직 포드를 선택하는데 사용합니다.
 
 <figure>
-  <img src="/media/kubernetes_service/ingress_controller.jpeg" alt="" width="820" />
+  <img src="/static/media/kubernetes_service/ingress_controller.jpeg" alt="" width="820" />
   <figcaption style={{ color: 'grey' }}>인그레스 동작방식</figcaption>
 </figure>
 

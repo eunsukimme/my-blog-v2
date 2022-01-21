@@ -10,7 +10,7 @@ tags:
   - web
   - CSS
   - TIL
-socialImage: '/media/css.png'
+socialImage: '/static/media/css.png'
 ---
 
 텍스트를 담고 있는 컨테이너가 작거나 모바일 환경과 같이 디바이스의 width 가 작은 경우, 텍스트 의 길이를 아예 뚝 잘라버리기 보다는 화면 길이만큼 보여지고 넘치기 전에 말줄임표(`...`) 를 붙여서 동적으로 텍스트 길이를 조정하고 싶은 경우가 있다. 이 때 활용하면 좋은 CSS 속성은 `text-overflow` 와 `-webkit-line-clamp` 가 있다.
@@ -52,7 +52,7 @@ p {
 ```
 
 <figure>
-  <img src="/media/text-overflow/Screen_Shot_2020-12-21_at_10.42.46_PM.png" />
+  <img src="/static/media/text-overflow/Screen_Shot_2020-12-21_at_10.42.46_PM.png" />
   <figcaption style={{ color: 'grey' }}>
     text-overflow 가 clip, ellipsis 인 p 태그(출처: MDN)
   </figcaption>
@@ -91,7 +91,7 @@ p {
 ```
 
 <figure>
-  <img src="/media/text-overflow/Screen_Shot_2020-12-21_at_11.09.05_PM.png" />
+  <img src="/static/media/text-overflow/Screen_Shot_2020-12-21_at_11.09.05_PM.png" />
   <figcaption style={{ color: 'grey' }}>
     -webkit-line-clamp: 3 이 적용되어 3줄 까지만 표시되고 그 뒤로는 말줄임표가 붙은 모습(출처: MDN)
   </figcaption>

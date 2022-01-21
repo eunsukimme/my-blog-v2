@@ -9,7 +9,7 @@ tags:
   - Frontend
   - Redux
   - Javascript
-socialImage: '/media/redux.png'
+socialImage: '/static/media/redux.png'
 ---
 
 이번 포스팅에서는 Redux 미들웨어가 어떻게 구성되어 있는지 알아보기 위해 [Redux Github](https://github.com/reduxjs/redux) 에 올라와있는 소스코드를 직접 뜯어보고, 간단한 미들웨어를 직접 만들어봄으로써 Redux 미들웨어의 동작 원리에 대해 알아보도록 하곘습니다.
@@ -161,7 +161,7 @@ dispatch = wrapDispatchByLogger1(wrapDispatchByLogger2(store.dispatch))
   <img
     style={{ objectFit: 'contain' }}
     alt="Applying Redux Middleware"
-    src="/media/redux/middleware/apply.png"
+    src="/static/media/redux/middleware/apply.png"
   />
   <figcaption style={{ color: 'grey' }}>Redux Middleware를 apply 하는 과정</figcaption>
 </figure>
@@ -172,7 +172,7 @@ dispatch = wrapDispatchByLogger1(wrapDispatchByLogger2(store.dispatch))
   <img
     style={{ objectFit: 'contain' }}
     alt="Dispatching an action to Redux Middleware"
-    src="/media/redux/middleware/dispatch.png"
+    src="/static/media/redux/middleware/dispatch.png"
   />
   <figcaption style={{ color: 'grey' }}>Action 이 Middleware 를 거쳐 Dispatch 되는 과정</figcaption>
 </figure>
@@ -219,7 +219,7 @@ render(
   <img
     style={{ width: '400px', objectFit: 'contain' }}
     alt="Redux Todo Example"
-    src="/media/redux/todo_example.png"
+    src="/static/media/redux/todo_example.png"
   />
   <figcaption style={{ color: 'grey' }}>Redux 의 todos 예제를 실행한 화면</figcaption>
 </figure>
@@ -230,7 +230,7 @@ render(
   <img
     style={{ objectFit: 'contain' }}
     alt="Redux Todo Example"
-    src="/media/redux/middleware/example.png"
+    src="/static/media/redux/middleware/example.png"
   />
   <figcaption style={{ color: 'grey' }}>Todo를 추가한 모습</figcaption>
 </figure>

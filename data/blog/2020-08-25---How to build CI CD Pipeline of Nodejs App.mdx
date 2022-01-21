@@ -15,12 +15,12 @@ tags:
   - CodeBuild
   - CodeDeploy
   - CodePipeline
-socialImage: '/media/node_codebuild_codedeploy_codepipeline/AWS_CICD.png'
+socialImage: '/static/media/node_codebuild_codedeploy_codepipeline/AWS_CICD.png'
 ---
 
 이번 포스팅에서는 Docker 와 AWS 서비스를 활용하여 EC2 에 Node.js 앱을 배포하는 방법을 설명하도록 하겠습니다. 전체적인 CI/CD 아키텍처를 그림으로 표현하면 다음과 같습니다.
 
-![/media/node_codebuild_codedeploy_codepipeline/AWS_CICD.png](/media/node_codebuild_codedeploy_codepipeline/AWS_CICD.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/AWS_CICD.png](/static/media/node_codebuild_codedeploy_codepipeline/AWS_CICD.png)
 
 전체적인 흐름을 설명하면, 개발자가 Github 에 코드를 푸쉬하면 CodePipeline 이 이를 감지하고, CodeBuild 를 실행시켜 도커 이미지를 생성합니다. 생성된 도커 이미지는 Docker hub 에 올라가고, 배포에 필요한 파일들을 S3 에 저장됩니다. 그런 다음 CodeDeploy 가 EC2 상의 Agent 를 실행시켜 S3에 저장된 파일들을 가져오도록 하고, Docker hub 에 올라간 이미지를 내려받아 컨테이너를 실행시킵니다.
 
@@ -72,37 +72,37 @@ CodeBuild 가 수행할 작업을 명시하는 buildspec 파일과 CodeDeploy �
 
 CodeBuild, CodeDeploy 를 설정하기 전 먼저 해당 서비스에 필요한 Role 을 만들어 주도록 하겠습니다. IAM 서비스 화면에서 `Create Role` 버튼을 눌러주세요.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.01.43_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.01.43_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.01.43_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.01.43_PM.png)
 
 ### Role for CodeBuild
 
 제일 먼저 CodeBuild 에 필요한 Role 을 생성해줍시다. 서비스 목록 중 `CodeBuild` 를 선택하고 `Next` 버튼을 눌러주세요.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.02.56_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.02.56_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.02.56_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.02.56_PM.png)
 
 CodeBuild 는 빌드가 완료된 뒤 만들어진 artifacts 를 S3 에 올리기 때문에 S3 에 접근할 수 있는 권한을 가져야 합니다. 여기서는 `AmazonS3FullAccess` 를 주도록 하겠습니다.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.03.29_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.03.29_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.03.29_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.03.29_PM.png)
 
 마지막으로 Role 이름을 설정한 뒤 `Create Role` 버튼을 눌러서 생성해주면 됩니다.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.04.31_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.04.31_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.04.31_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.04.31_PM.png)
 
 ### Role for CodeDeploy
 
 다음으로 CodeDeploy 에 필요한 Role 을 생성해줍시다. 이 때 서비스로 `CodeDeploy` 를 선택한 뒤 유스케이스로 `CodeDeploy` 를 선택해주면 됩니다.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.15.54_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.15.54_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.15.54_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.15.54_PM.png)
 
 CodeDeploy 의 경우 기본적으로 `AWSCodeDeployRole` 이 부여됩니다. 다른 설정은 모두 건너 뛰고 Role 이름을 설정한 뒤 `Create Role` 버튼을 눌러서 생성을 완료해줍시다.(아래 사진에서 Permission boundary 가 설정되어 있는데, 잘못 설정한 것이니 무시하시면 됩니다.)
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.20.22_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.20.22_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.20.22_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.20.22_PM.png)
 
 CodeDeploy 의 경우 CodeBuild 에서 생성된 artifacts 를 가져와야 하기 때문에 S3에 접근할 수 있어야 합니다. 마찬가지로 permission policy 로 `AamazonS3FullAccess` 를 부여해줍시다.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.26.04_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.26.04_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.26.04_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.26.04_PM.png)
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.34.42_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.34.42_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.34.42_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.34.42_PM.png)
 
 ---
 
@@ -114,11 +114,11 @@ CodeDeploy 의 경우 CodeBuild 에서 생성된 artifacts 를 가져와야 하�
 
 CodeBuild 서비스 화면에서 `Create build project` 버튼을 눌러주세요.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_6.56.38_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_6.56.38_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_6.56.38_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_6.56.38_PM.png)
 
 제일 먼저 빌드 프로젝트의 이름을 설정해줍시다. 여기서는 `codepipeline-test` 라고 주었습니다.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_6.57.45_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_6.57.45_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_6.57.45_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_6.57.45_PM.png)
 
 ### Source
 
@@ -126,7 +126,7 @@ CodeBuild 서비스 화면에서 `Create build project` 버튼을 눌러주세�
 
 **Note**: 이때 주의해야 할 것은 `Primary soource webhook events` 웹훅 체크박스는 해제해야 합니다. 왜냐하면 나중에 CodePipeline 을 설정해줄 때 웹훅을 적용하기 때문에 여기서 적용하면 푸시할 때 빌드가 두 번 돌아가게 됩니다.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_6.58.27_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_6.58.27_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_6.58.27_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_6.58.27_PM.png)
 
 ### Environment
 
@@ -134,17 +134,17 @@ CodeBuild 서비스 화면에서 `Create build project` 버튼을 눌러주세�
 
 이때 맨 아래에 `Privileged` 섹션에서 체크박스를 체크해 주어야 합니다. 왜냐하면 Docker 를 사용해서 빌드를 하고, 빌드된 이미지를 Docker hub 에 올려야 하기 때문에 Docker 가 설치된 이미지를 사용해야 하기 때문입니다.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.05.09_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.05.09_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.05.09_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.05.09_PM.png)
 
 그런 다음 `Service role` 로 조금 전에 만들어준 CodeBuild role 을 제공하면 됩니다.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.07.47_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.07.47_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.07.47_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.07.47_PM.png)
 
 ### Buildspec
 
 마지막으로 CodeBuild 가 참조할 파일인 buildspec 을 정의할 수 있습니다. 여기서는 `buildspec.dev.yml` 이란 이름의 파일을 참조하도록 하였습니다.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.08.30_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.08.30_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.08.30_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.08.30_PM.png)
 
 맨 아래 완료 버튼을 눌러주면 이로써 CodeBuild 설정은 끝났습니다.
 
@@ -158,11 +158,11 @@ CodeBuild 서비스 화면에서 `Create build project` 버튼을 눌러주세�
 
 CodeBuild 에서는 project라는 용어로 빌드 프로젝트를 생성했는데, CodeDeploy 에서는 비슷한 개념으로 application 이란 용어를 사용합니다. CodeDeploy 서비스 화면에서 `Create application` 버튼을 눌러서 새로운 어플리케이션을 생성해 줍시다.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.09.00_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.09.00_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.09.00_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.09.00_PM.png)
 
 제일 먼저 어플리케이션 이름을 설정하고, `Compute platform` 를 `EC2/On-premises` 로 설정해 줍시다.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.09.25_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.09.25_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.09.25_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.09.25_PM.png)
 
 이렇게 하면 하나의 CodeDeploy application 이 생성됩니다. 더 자세한 설정은 아래 Deployment Group 에서 하게 됩니다.
 
@@ -172,11 +172,11 @@ Application 을 생성한 뒤 하위 개념인 deployment group 을 새로 만�
 
 일단 `Create deployment group` 을 눌러서 새로운 그룹을 생성해 줍시다.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.09.58_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.09.58_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.09.58_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.09.58_PM.png)
 
 제일 먼저 그룹 이름을 설정할 수 있습니다. 여기선 `dev` 란 이름으로 설정하였습니다. 그런 다음 role 을 설정해야 하는데, 역시 맨 처음 생성했던 CodeDeploy role 을 제공하면 됩니다.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.21.11_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.21.11_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.21.11_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.21.11_PM.png)
 
 ### Environment
 
@@ -184,7 +184,7 @@ CodeBuild 에서는 Environment 가 빌드하기 위해 프로비저닝 할 환�
 
 `Amazon EC2 instances` 를 선택한 뒤 `Key` 는 `Name` 으로 설정하여 EC2 의 이름으로 선택할 수 있도록 하고, `Value` 로 배포하고자 하는 EC2 의 이름을 입력해줍시다.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.21.54_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.21.54_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.21.54_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.21.54_PM.png)
 
 ### Agent Configuration
 
@@ -198,7 +198,7 @@ CodeBuild 에서는 Environment 가 빌드하기 위해 프로비저닝 할 환�
 
 마지막으로 `Load balancer` 를 설정해서 배포 중 트래픽을 조절할 수 있는데, 여기서는 다루지 않겠습니다. 체크박스를 해제한 뒤 `Create deployment group` 버튼을 눌러서 생성을 완료해줍시다.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.22.37_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.22.37_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.22.37_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.22.37_PM.png)
 
 ---
 
@@ -206,13 +206,13 @@ CodeBuild 에서는 Environment 가 빌드하기 위해 프로비저닝 할 환�
 
 자, 이제 CodePipeline 을 생성해서 이전에 만든 CodeBuild 와 CodeDeploy 를 이어주도록 합시다. CodePipeline 서비스 화면에서 `Create pipeline` 버튼을 눌러주세요.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.23.36_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.23.36_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.23.36_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.23.36_PM.png)
 
 ### Pipeline settings
 
 제일 먼저 파이프라인의 이름을 정할 수 있습니다. 그리고 role 을 설정할 수 있는데 여기서는 새로운 role 을 만들어 주는 걸 선택해 줍시다.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_8.35.35_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_8.35.35_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_8.35.35_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_8.35.35_PM.png)
 
 ### Add Source Stage
 
@@ -220,23 +220,23 @@ CodeBuild 에서는 Environment 가 빌드하기 위해 프로비저닝 할 환�
 
 그리고 `Change detection options` 를 `Github webhooks` 로 설정해줘서 remote 상에서 파일의 변화가 생겼을 때 해당 파이프라인이 실행되도록 해주면 됩니다.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.44.34_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.44.34_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.44.34_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.44.34_PM.png)
 
 ### Add Build Stage
 
 다음으로 빌드 단계에서 실행할 작업을 정의해줍시다. `Build provider` 는 `AWS CodeBuild` 로 설정하고, 이전에 만든 CodeBuild 프로젝트를 선택하면 됩니다.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.45.28_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.45.28_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.45.28_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.45.28_PM.png)
 
 ### Add Deploy Stage
 
 마지막으로 배포 단계에서 실행할 작업을 정의해줍시다. `Deploy provider` 는 `AWS CodeDeploy` 로 설정한 뒤 조금 전에 만들었던 CodeDeploy 어플리케이션을 선택하고, 배포할 그룹을 설정해주면 됩니다.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.46.02_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.46.02_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.46.02_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.46.02_PM.png)
 
 자, 이로써 CodeBuild, CodeDeploy, CodePipeline 까지 모든 설정이 끝났습니다. `Next` 버튼을 누르면 현재까지 설정한 것들을 review 할 수 있습니다. 이마저 완료하면 해당 파이프라인이 생성되고, 다음과 같이 알아서 파이프라인이 돌아가고 있는 걸 확인할 수 있습니다.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.56.15_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.56.15_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.56.15_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_7.56.15_PM.png)
 
 ---
 
@@ -246,11 +246,11 @@ CodeBuild 에서는 Environment 가 빌드하기 위해 프로비저닝 할 환�
 
 `docker ps` 명령으로 docker 프로세스가 잘 실행되고 있는 것 또한 확인할 수 있네요.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_8.06.22_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_8.06.22_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_8.06.22_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_8.06.22_PM.png)
 
 EC2 의 ip 주소와 서버에 할당된 포트번호를 브라우저에 입력해서 접속을 시도하면 다음과 같이 잘 연결되는 것 또한 확인할 수 있습니다.
 
-![/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_8.06.55_PM.png](/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_8.06.55_PM.png)
+![/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_8.06.55_PM.png](/static/media/node_codebuild_codedeploy_codepipeline/Screen_Shot_2020-08-24_at_8.06.55_PM.png)
 
 ---
 
