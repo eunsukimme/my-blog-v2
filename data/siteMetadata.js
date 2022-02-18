@@ -5,7 +5,7 @@ const siteMetadata = {
   description: 'A Blog by Eunsu Kim',
   language: 'ko-kr',
   theme: 'system', // system, dark or light
-  siteUrl: 'https://tailwind-nextjs-starter-blog.vercel.app', // TODO:
+  siteUrl: 'https://blog.eunsukim.me',
   siteRepo: 'https://github.com/eunsukimme/my-blog-v2',
   siteLogo: '/static/images/logo.png', // TODO:
   image: '/static/images/avatar-me.jpg',
