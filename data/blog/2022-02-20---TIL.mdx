@@ -1,0 +1,139 @@
+---
+title: TIL - AST(Abstract Syntax Tree)와 ESLint Rules
+summary: Today I learned - Abstract Syntax Tree와 ESLint Rules에 관하여
+date: '2022-02-20T18:30:00.000Z'
+draft: false
+slug: 'til-ast-and-eslint'
+category: TIL
+tags:
+  - TIL
+  - AST
+  - ESLint
+socialImage: '/social_image.png'
+---
+
+한가로운 일요일 오후, 집 근처 카페에서 이메일을 뒤적이고 있었다. 인박스에 있던 Medium daily digest를 천천히 살펴보던 도중, 흥미로운 블로그 글들을 읽었다.
+
+- [Use ESLint to Enforce Design System](https://medium.com/quick-code/use-eslint-to-enforce-design-system-eaffbb1cd4e7)
+- [Enforcing good practices in the front-end](https://medium.com/alan/enforcing-good-practices-in-the-front-end-5e0f70b8481c)
+
+AST와 ESLint에 관한 내용을 다룬 글이었다. 평소 AST에 관심이 많았고 또 ESLint의 rule이 어떻게 동작하는지 궁금했던 나의 호기심을 해소해준 좋은 글이었다.
+
+# Abstract Syntax Tree
+
+AST는 자바스크립트 코드를 추상적인 형태의 트리로 나타낸 자료구조를 말한다. Webpack, Babel, Prettier 등 코드 레벨에서 이뤄지는 일들(린트, 포맷, 트리쉐이킹 등)이 가능한 이유가 바로 AST를 활용하기 떄문이다.
+다음과 같은 코드가 있다고 했을때, 이를 [AST Explorer](https://astexplorer.net/)에서 살펴보면 다음과 같은 트리가 만들어진다.
+
+```js
+const helloWorld = 'hello world'
+```
+
+```json
+{
+  "type": "Program",
+  "start": 0,
+  "end": 33,
+  "body": [
+    {
+      "type": "VariableDeclaration",
+      "start": 0,
+      "end": 33,
+      "declarations": [
+        {
+          "type": "VariableDeclarator",
+          "start": 6,
+          "end": 32,
+          "id": {
+            "type": "Identifier",
+            "start": 6,
+            "end": 16,
+            "name": "helloWorld"
+          },
+          "init": {
+            "type": "Literal",
+            "start": 19,
+            "end": 32,
+            "value": "hello world",
+            "raw": "'hello world'"
+          }
+        }
+      ],
+      "kind": "const"
+    }
+  ],
+  "sourceType": "module"
+}
+```
+
+Top-level 속성에서 현재 코드에 대한 정보를 알 수 있고, `body` 필드 아래에 구문 트리가 담겨진다.
+코드에는 변수를 선언하는 1 line만 있기 때문에, `body`의 `declarations` 속성은 단 하나의 `VariableDeclaration` type의 오브젝트를 포함하고 있다.
+선언한 변수의 이름이 `helloWorld`이기 때문에 `id.Identifier`의 `name` 속성에 `helloWorld`란 값이 포함되어있다.
+또 변수에 할당된 값은 스트링 리터럴 이기 때문에 `Literal` type의 오브젝트가 포함되고, 그 `value` 속성으로 할당한 값인 `hello world`가 들어가있다.
+
+이런 식으로 단 한 줄의 코드라도 이를 자료구조로 나타내면 조금 복잡해지는 걸 알 수 있다. 보기에는 조금 어려워 보이는 AST지만 이를 활용했을 때 정말 magic처럼 느껴지는 것들을 만들 수 있다.
+
+# ESLint rules
+
+위에서 언급한 블로그 글에서는 ESLint가 어떻게 AST를 활용하여 코드 린트를 수행하는지를 소개했다. ESLint의 커스텀 rule을 적용하기 위해선, 다음과 같은 pre-defined된 형식에 맞게 자바스크립트 오브젝트를 작성하면 된다.
+
+```js
+module.exports = {
+  meta: {
+    type: "layout",
+    docs: {
+      description: "enforce pascal case enum names",
+      category: "Stylistic Issues",
+    },
+    fixable: "code",
+    messages: {
+      pascalCaseEnumNamesMessage:
+        "Enum name should be pascal case, was: {{name}}, expected: {{pascalCaseName}}",
+    },
+  },
+  create: function (context) {
+    return {
+      “TSEnumDeclaration > Identifier”: (node) => {
+        const name = node.name;
+        const pascalCaseName = toPascalCase(name);
+        if (name !== pascalCaseName) {
+          context.report({
+            node,
+            messageId: "pascalCaseEnumNamesMessage",
+            data: {
+              name,
+              pascalCaseName,
+            },
+            fix: function (fixer) {
+              return fixer.replaceText(node, pascalCaseName);
+            }
+          });
+        }
+      }
+    }
+  }
+}
+```
+
+위 룰은 Enum의 필드를 파스칼 케이스로 강제하도록 하는 룰이다. 먼저 ESLint 룰을 간단히 설명하면, `meta` 와 `create` 두 가지 속성을 갖는 오브젝트이다.
+`meta` 속성는 룰에 대한 메타데이터를 포함한다. 여기서 포함된 메타데이터는 다음과 같다.
+
+- `type`: 룰의 타입을 나타낸다. 타입은 `problem`, `suggestion`, 그리고 `layout`가 있는데, 여기서 적용된 `layout`은 코드 실행에 영향을 주지 않는 단순한 표현 방식에 대한 것을 뜻한다.
+- `docs`: 사용자에게 보여지는 문서 역학을 한다.
+- `fixable`: `eslint --fix` command에 의해 수정될 수 있는지 나타낸다. 가능한 값으로 `code` 와 `whitespace` 가 있다.
+- `messages`: 룰에 의해 사용되는 메시지를 나타낸다. 나중에 테스트할 때 유용하게 사용할 수 있다. 위 룰의 메시지는 `name`, `pascalCaseName` 2 placeholder를 갖는다.
+
+`create` 속성은 ESLint가 AST의 각 노드를 방문하면서 호출하는 함수를 가진 오브젝트를 반환하는 함수이다. 이 오브젝트는 visitor pattern의 visitor가 되어서 각 노드에 방문할 때 마다 실행될 로직을 포함한다.
+방문자 오브젝트가 갖는 속성의 이름은 AST에서 우리가 방문하고자 하는 노드의 이름이 될 수 있다. 이 이름은 단순한 노드를 나타낼 수도 있고, 위 룰처럼 [Selectors](https://eslint.org/docs/developer-guide/selectors)를 활용하여 여러 노드 간의 관계를 표현할 수도 있다.
+이 함수는 `context`라는 파라미터를 받는데, 현재 룰에 대한 정보와 룰에 적용할 수 있는 유틸리티들을 제공한다. 위 룰에서는 `context.report()` 메서드를 사용했는데, 이는 IDE와 연동되어 사용자에게 알려줄 수 있는 기능을 포함한다.
+
+위 룰에서 `create` 함수가 반환한 방문자 오브젝트의 역할을 보면, `TSEnumDeclaration`의 `Identifier` 노드를 방문하여 해당 노드의 이름, 즉 Enum의 key가 파스칼 케이스인지 확인한다.
+만약 파스칼 케이스가 아니라면 레포트를 생성하고, `fix` 파라미터를 제공하여 파스칼 케이스로 변경할 수 있는 여지를 함께 제공한다.
+
+ESLint는 이렇게 작성된 룰이 제대로 동작하는지 확인하기 위해 [Rule Tester](https://eslint.org/docs/developer-guide/nodejs-api#ruletester)를 활용하여 테스트하는 방법도 제공하고있다.
+ESLint rule을 작성하는 것에 관한 더 많은 내용은 [공식 문서](https://eslint.org/docs/developer-guide/working-with-rules)에 상세히 나와있다.
+
+# Conclusion
+
+블로그 글을 읽으며 AST와 ESLint를 약간이나마 이해할 수 있게 되어서 재밌었다.
+또한 토크나이징, 파싱과 관련한 몇 가지 라이브러리도 알게 되었는데, Node.js DOM 구현체인 [jsdom](https://github.com/jsdom/jsdom)에서 [parse5](https://github.com/inikulin/parse5)를 활용하여
+HTML을 파싱하고 있단 사실도 흥미로웠다.
