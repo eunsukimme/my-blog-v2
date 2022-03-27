@@ -1,0 +1,135 @@
+---
+title: Chrome DevTools로 JS 메모리 누수(Memory Leak) 디버깅하기
+summary: Chrome DevTools를 활용하여 Javascript 메모리 누수를 디버깅 한 경험을 기록합니다.
+date: '2022-03-27T20:00:00.000Z'
+draft: false
+slug: 'debugging-javascript-memory-leak-with-chrome-devtools'
+category: javascript
+tags:
+  - javascript
+  - browser
+  - chrome
+  - memoryleak
+socialImage: '/social_image.png'
+---
+
+재직중인 회사에서 만드는 웹앱에 메모리 누수가 생기는 이슈가 있었는데, 이 이슈를 해결한 과정을 기록하고자 한다.
+이번 포스팅에서는 JS의 메모리 구조, Chrome DevTools의 메모리 관련 기능들, 그리고 메모리 누수 탐지 및 해결 방법에 대해 소개하고자 한다.
+
+# Intro
+
+현재 속한 팀에서 개발자 교육에 사용되는 LMS를 만들고 있는데, 여기에 라이브 클래스룸이란 기능이 탑재되어있다.
+라이브 클래스룸(A.K.A 라클룸)은 실시간으로 인터랙티브한 교육이 이뤄지도록 하는 WebRTC 애플리케이션인데, 아래 스크린샷을 보면 어떤 기능인지 대략 감이 잡힐 것이다.
+
+<figure>
+  <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/liveclass-room.jpg" />
+  <figcaption style={{ margin: 0, color: 'grey' }}>
+    라이브 클래스룸 애플리케이션 UI 디자인
+  </figcaption>
+</figure>
+
+그런데 이 라클룸을 개발하는 중 앱이 어느 순간부터 느리게 동작하는 현상을 발견했다. 새로고침을 하면 한참을 기다려야 페이지가 로드된다거나, 채팅 입력이 느려지는 등의 현상이 발견됐다.
+그래서 이러한 경험을 개선하는 과제가 나에게 주어졌고, 나는 메모리 쪽 이슈인 것 같다고 짐작하고 문제를 자세히 살펴보기로 했다.
+
+## 3 Types of Memory Issues
+
+메모리 관련 이슈는 크게 3가지 유형으로 나타난다.
+
+### 1. 페이지가 시간이 지남에 따라 느려진다
+
+처음에는 페이지가 느리단 걸 인식하지 못하지만, 시간이 지남에 따라 느리다고 느껴지는 경우 메모리 누수, 즉 메모리릭(Memory Leak)이 발생한다고 볼 수 있다.
+
+### 2. 페이지가 일관되게 느리다
+
+페이지가 처음부터 느리다고 느껴진다면, 이는 Memory bloat(한국어로 무엇이라 부르는진 모르겠다)으로 볼 수 있다. Memory bloat은 페이지가 최적화된 속도에 필요한 메모리보다 기본적으로 더 많은 메모리를 사용하는 것을 말한다.
+
+### 3. 페이지가 뚝 뚝 끊긴다
+
+페이지가 뚝 뚝 끊기는 현상은 가비지 콜렉션(Garbage Collection)이 너무 자주 일어날 때 발생한다. GC는 사용하지 않는 메모리를 해제하는 역할을 하는데, GC가 도는 시점은 브라우저가 결정한다(또는 브라우저 개발자 도구에서 직접 실행할 수도 있다).
+GC가 돌면 모든 JS 스크립트의 실행이 중지된다. 즉, GC가 자주 돈다는 것은 JS 스크립트의 실행이 자주 멈춘다는 것이다.
+
+라클룸의 경우는 페이지가 처음부터 느리진 않은데, 시간이 지나야 느리단게 느껴졌기 때문에 1번, 메모리릭이 발생하고 있다고 판단했다.
+정확히 어떤 상황에서 메모리릭이 발생하는지 살펴보기 위해, 본격적으로 Chrome DevTools를 활용해 메모리 사용량을 검사해보았다.
+
+# Monitor memory usage with the Chrome Task Manager
+
+메모리 이슈를 진단하기 위해선 Chrome Task Manager로 메모리 사용량을 보는것이 좋다. 메모리 사용량을 실시간으로 모니터링할 수 있기 때문이다.
+Chrome 우측 상단 메뉴 > More Tools > Task Manager를 실행하면 다음과 같은 화면이 나온다.
+
+<figure>
+  <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/chrome-task-manager.png" />
+  <figcaption style={{ margin: 0, color: 'grey' }}>Chrome Task Manager</figcaption>
+</figure>
+
+여기서 눈여겨봐야 할 컬럼은 **Memory Footprint**와 **Javascript Memory**이다.
+
+- **Memory Footprint** 컬럼은 native memory 사용량을 보여준다. DOM 노드는 네이티브 메모리에 저장되는데, 만약 이 컬럼 값이 증가한다면 DOM 노드가 증가한다는 의미다.
+- **Javascript Memory** 컬럼은 JS Heap 사용량을 보여준다. 여기서 `()`로 감싸진 부분이 중요한데, 이 부분이 live number로 현재 페이지에서 접근 가능한 객체들이 사용중인 메모리를 뜻한다.
+  이 부분이 증가한다는 것은 객체가 새로 생성되거나, 이미 존재한 객체가 더 커진 걸 의미한다.
+
+라이브 클래스룸창을 띄워두고 Chrome Task Manager로 메모리 사용량을 살펴보았다.
+여러가지 액션을 수행하면서 메모리를 모니터링 하는 도중, 카메라가 나오는 영역 페이지를 넘길때마다(`<`, `>` 버튼 클릭) live number가 증가하는 현상을 발견했다.
+좀 더 자세히 살펴보기 위해 Chrome Performance탭의 Profiling 기능을 활용해보았다.
+
+# Chrome performance profiling
+
+Chrome DevTools에서 **Performance** > **Memory 체크박스** 선택(활성화) 후 Record 버튼을 누르면 시간에 따른 메모리 사용량을 시각화해서 보여준다.
+Record 버튼을 누르고 페이지네이션을 여러번 수행해본 다음 stop 버튼을 눌러 중지해보니, 다음과 같은 결과가 나왔다.
+
+<figure>
+  <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/first-performance-profiling-result.png" />
+  <figcaption style={{ margin: 0, color: 'grey' }}>Chrome Performance Profiling Result</figcaption>
+</figure>
+
+위 그래프를 살펴보면 JS Heap, Documents, Nodes, Listeners가 모두 계단식으로 증가하고있다. 즉 이를 바탕으로 다음과 같은 문제가 있다는 것을 인식할 수 있다.
+
+- **JS Heap에서 메모리 릭이 발생하고 있다**.
+- **할당된 Listeners가 해제되지 않고 있다**.
+- **Documents, Nodes가 계속 쌓여간다. 즉, detached DOM들이 존재한다**.
+
+**Note.** 여기서 detached DOM이란 현재 페이지에서 더 이상 존재하지 않지만 JS에 의해 여전히 참조되고 있는 DOM element를 말한다.
+브라우저가 이러한 detached DOM들을 GC로 수직하기 위해선, JS의 참조를 해제해주어야 한다.
+
+이러한 문제를 해결한 과정을 위 순서대로 소개하겠다(실제 디버깅에서는 순서대로 해결하진 않았다.)
+
+# Debugging JS heap memory leak with Allocation Timeline
+
+JS Heap에서 발생한 메모리릭을 살펴보려면 Chrome DevTools에서 **Memory** > **Profiles** > **Allocation instrumentation on timeline** 을 선택한 뒤 `Start` 버튼을 눌러
+분석을 시작할 수 있다. 메모리릭을 발생시킬 것으로 의심되는 액션을 몇 차례 수행한 뒤, `Stop` 버튼을 눌러 분석을 종료하니 다음과 같은 화면을 볼 수 있었다.
+
+<figure>
+  <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/first-memory-allocation-timeline-result.png" />
+  <figcaption style={{ margin: 0, color: 'grey' }}>
+    Chrome Memory Allocation Timeline Result
+  </figcaption>
+</figure>
+
+왼쪽 패널은 분석 결과 목록을 나타내고 오른쪽 패널은 시간에 따른 메모리 사용량과 관련 정보를 보여준다.
+그래프를 보면 파란색 막대는 해당 순간의 메모리 할당을 나타낸다. 원래 회색 막대도 보이는데, 회색 막대는 메모리 해제를 의미한다. 여기서는 회색 막대를 찾아볼 수 없으니, 메모리릭이 발생하는게 분명하다.
+
+0 ~ 5초 사이에 막대가 하나 보여서 해당 부분을 선택해보고, Retained Size를 기준으로 내림차순 정렬해보니 상위 항목으로 `AnimationItem`이 존재한다.
+이 `AnimationItem`을 생성한 곳은 `lottie.js:14372`이다. 즉, lottie를 사용하는 코드에서 문제가 있는 것으로 판단된다.
+
+라이브 클래스룸 코드를 살펴보니 실제로 lottie를 사용하는 `lottie-web` 라이브러리를 활용하여 애니메이션을 보여주는 컴포넌트가 있었다.
+해당 컴포넌트에서 마운트되는 시점에 `lottie.loadAnimation()` 으로 애니메이션을 불러오고 있었다.
+lottie는 잘 몰라서 공식 문서를 찾아보니 `lottie.loadAnimation()` 으로 animation instance를 반환하는데, 해당 인스턴스의 메소드로 `.destroy()`가 있단 걸 알게됐다.
+메모리를 해제해주는 것 같은 이름의 메소드가 있단 것은 해당 컴포넌트가 unmount될 때 이를 호출해줘야 할 것 같단 생각이 들었고, 이를 적용해보았다.
+
+```typescript
+// Lottie.vue
+onUnmounted(() => {
+  animation.value?.stop()
+  animation.value?.destroy()
+})
+```
+
+그런 다음 Performance Profiling을 수행해보았다.
+
+<figure>
+  <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/memory-allocation-timeline-result-after-fix.png" />
+  <figcaption style={{ margin: 0, color: 'grey' }}>
+    unmount시에 animation instance를 destroy 해준 다음 측정한 Chrome Performance Profiling Result
+  </figcaption>
+</figure>
+
+JS Heap 그래프가 GC가 돌 때마다 뚝뚝 떨어진다. 이전의 계단식 모양을 유지하지 않는다. 이로써 JS Heap 메모리릭은 해결할 수 있었다.
