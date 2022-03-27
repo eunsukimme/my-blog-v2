@@ -13,8 +13,8 @@ tags:
 socialImage: '/social_image.png'
 ---
 
-재직중인 회사에서 만드는 웹앱에 메모리 누수가 생기는 이슈가 있었는데, 이 이슈를 해결한 과정을 기록하고자 한다.
-이번 포스팅에서는 JS의 메모리 구조, Chrome DevTools의 메모리 관련 기능들, 그리고 메모리 누수 탐지 및 해결 방법에 대해 소개하고자 한다.
+회사에서 만드는 웹앱에 메모리 누수가 생기는 이슈가 있었는데, 이 이슈를 해결한 과정을 기록하고자 한다.
+이번 포스팅에서는 JS의 메모리 구조, Chrome DevTools의 메모리 관련 기능들, 그리고 메모리 누수 진단 및 해결 방법에 대해 소개하고자 한다.
 
 # Intro
 
@@ -85,12 +85,9 @@ Record 버튼을 누르고 페이지네이션을 여러번 수행해본 다음 s
 
 - **JS Heap에서 메모리 릭이 발생하고 있다**.
 - **할당된 Listeners가 해제되지 않고 있다**.
-- **Documents, Nodes가 계속 쌓여간다. 즉, detached DOM들이 존재한다**.
+- **Documents, Nodes가 계속 쌓여간다. 즉, detached DOM<sup>[[1]](#detached_dom)</sup>들이 존재한다**.
 
-**Note.** 여기서 detached DOM이란 현재 페이지에서 더 이상 존재하지 않지만 JS에 의해 여전히 참조되고 있는 DOM element를 말한다.
-브라우저가 이러한 detached DOM들을 GC로 수직하기 위해선, JS의 참조를 해제해주어야 한다.
-
-이러한 문제를 해결한 과정을 위 순서대로 소개하겠다(실제 디버깅에서는 순서대로 해결하진 않았다.)
+이러한 문제를 해결한 과정을 위 순서대로 소개하겠다.
 
 # Debugging JS heap memory leak with Allocation Timeline
 
@@ -107,8 +104,8 @@ JS Heap에서 발생한 메모리릭을 살펴보려면 Chrome DevTools에서 **
 왼쪽 패널은 분석 결과 목록을 나타내고 오른쪽 패널은 시간에 따른 메모리 사용량과 관련 정보를 보여준다.
 그래프를 보면 파란색 막대는 해당 순간의 메모리 할당을 나타낸다. 원래 회색 막대도 보이는데, 회색 막대는 메모리 해제를 의미한다. 여기서는 회색 막대를 찾아볼 수 없으니, 메모리릭이 발생하는게 분명하다.
 
-0 ~ 5초 사이에 막대가 하나 보여서 해당 부분을 선택해보고, Retained Size를 기준으로 내림차순 정렬해보니 상위 항목으로 `AnimationItem`이 존재한다.
-이 `AnimationItem`을 생성한 곳은 `lottie.js:14372`이다. 즉, lottie를 사용하는 코드에서 문제가 있는 것으로 판단된다.
+0 ~ 5초 사이에 막대가 하나 보여서 해당 부분을 선택해보고, Retained Size<sup>[[2]](#retained_size)</sup>를 기준으로 내림차순 정렬해보니 system 다음으로 `AnimationItem` 생성자가 가장 많은 Retained Size를 차지한다.
+이 `AnimationItem` 생성자를 호출한 곳은 `lottie.js:14372`이다. 즉, lottie를 사용하는 코드에서 문제가 있는 것으로 판단된다.
 
 라이브 클래스룸 코드를 살펴보니 실제로 lottie를 사용하는 `lottie-web` 라이브러리를 활용하여 애니메이션을 보여주는 컴포넌트가 있었다.
 해당 컴포넌트에서 마운트되는 시점에 `lottie.loadAnimation()` 으로 애니메이션을 불러오고 있었다.
@@ -126,10 +123,133 @@ onUnmounted(() => {
 그런 다음 Performance Profiling을 수행해보았다.
 
 <figure>
-  <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/memory-allocation-timeline-result-after-fix.png" />
+  <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/performance-profiling-result-after-fix.png" />
   <figcaption style={{ margin: 0, color: 'grey' }}>
     unmount시에 animation instance를 destroy 해준 다음 측정한 Chrome Performance Profiling Result
   </figcaption>
 </figure>
 
 JS Heap 그래프가 GC가 돌 때마다 뚝뚝 떨어진다. 이전의 계단식 모양을 유지하지 않는다. 이로써 JS Heap 메모리릭은 해결할 수 있었다.
+
+## Removing Event Listeners on unmount
+
+또 기존에는 애니메이션이 필요하지 않은 상황에서도 lottie를 렌더링 하고 있었는데, `v-if` directive를 사용하여 필요한 경우에만 lottie를 렌더링하도록 하고,
+애니메이션이 로드된 시점에서 `complete` 이벤트 리스너를 추가하던 부분이 있었는데 unmount 할 때 이벤트 리스너를 제거하도록 수정해보았다.
+
+<figure>
+  <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/performance-profiling-result-after-removing-event-listeners.png" />
+  <figcaption style={{ margin: 0, color: 'grey' }}>
+    unmount시에 event listener를 제거해준 다음 측정한 Chrome Performance Profiling Result
+  </figcaption>
+</figure>
+
+Listeners 그래프도 GC가 돌때 JS Heap과 함께 감소하는 것을 확인할 수 있었다. 이로써 Listeners 문제도 해결할 수 있었다.
+
+# Debugging Detached DOM with Heap Snapshots
+
+마지막으로 detached DOM 문제를 해결하기 위해 Chrome DevTools에서 **Memory** > **Profiles** > **Heap Snapshots** 을 선택한 뒤 `Take snapshot` 버튼을 눌러
+해당 시점의 JS와 DOM 노드 사이의 메모리가 어떻게 분배되어 있는지 확인할 수 있다.
+
+<figure>
+  <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/first-memory-heap-snatshot.png" />
+  <figcaption style={{ margin: 0, color: 'grey' }}>Chrome Memory Heap Snapshots Result</figcaption>
+</figure>
+
+`Snapshot 1`은 Major GC이후, 페이지 전환 시도하기 전 초기 메모리 상태를 기록하고자 dump한 메모리 스냅샷이고 `Snapshot 2`는 페이지 전환 시도 후 메모리 스냅샷이다.
+`Snapshot 1`과 `Snapshot 2`를 비교한 Comparison 뷰에서 `detached` 키워드로 필터링하고 Size Delta를 기준으로 내림차순 정렬하면, `SVG**Element` 가 상위에 기록된다.
+즉, 페이지 전환 클릭 시 현재 화면에서 SVGElement가 사라지지만, JS에 의해 여전히 참조되고 있는 것 같다.
+
+그래서 코드를 살펴보니 페이지 전환할 때 렌더링되는 컴포넌트 안에서 `<SvgIcon />` 이란 컴포넌트를 사용하고 있었고, 여기서 svg를 렌더링하고 있었다.
+`<SvgIcon />`가 svg를 image sprite 처럼 사용할 목적으로 여러 symbol이 정의된 `defs.svg` 를 `<use>` 태그로 참조할 수 있게 만들어둔 컴포넌트인데, 여기서 무언가 문제가 되는 것 같았다.
+그래서 해당 컴포넌트를 제거해보고 힙 스냅샷을 기록해보았다.
+
+<figure>
+  <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/memory-heap-snapshot-after-remove-svg.png" />
+  <figcaption style={{ margin: 0, color: 'grey' }}>
+    `<SvgIcon />` 컴포넌트를 제거한 뒤 측정한 Chrome Memory Heap Snapshots Result
+  </figcaption>
+</figure>
+
+`<SvgIcon />` 컴포넌트를 제거해보니 detached DOM들이 대부분 제거된 것을 확인할 수 있었다. 그래서 해당 컴포넌트를 빼고 svg를 inline 시킨 별도의 컴포넌트로 교체하는 작업을 진행했다.
+그런 다음 다시 한 번 힙 스냅샷을 떠봤다.
+
+<figure>
+  <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/memory-heap-snapshot-after-inlining-svg.png" />
+  <figcaption style={{ margin: 0, color: 'grey' }}>
+    `<SvgIcon />` 컴포넌트를 inline svg 컴포넌트로 교체한 뒤 측정한 Chrome Memory Heap Snapshots
+    Result
+  </figcaption>
+</figure>
+
+`<SvgIcon />` 컴포넌트를 완전히 제거한 것 보단 detached DOM들이 생성되었지만, 메모리에 미치는 영향은 매우 미미하다고 판단된다(~70KB).
+마음같아선 detached DOM들이 아예 안생기게 svg를 `<img />` 태그의 `src`로 사용하고 싶었지만, 라이브 클래스룸 웹앱에서 사용한 svg의 경우 css로 색깔을 변경하고 있었기 때문에, 일단 svg를 inline한 컴포넌트를 사용하는 방식으로 문제를 해결했다.
+
+# Comparison
+
+이렇게 해서 3가지 메모리 이슈를 모두 해결했다. 여기까지 디버깅을 진행하면서 얼마만큼의 메모리 사용량이 개선되었는지 측정해보았다.
+라이브 클래스룸에서 카메라 영역을 총 7번 페이지네이션 할 경우의 Chrome performance profiling 결과를 비교하면 다음과 같다.
+
+## Before
+
+<figure>
+  <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/first-performance-profiling-result.png" />
+  <figcaption style={{ margin: 0, color: 'grey' }}>
+    First Chrome Performance Profiling Result
+  </figcaption>
+</figure>
+
+- JS Heap: ±28.1MB
+- Documents: ±8개
+- Nodes: ±11152개
+- Listeners: ±40개
+
+## After
+
+<figure>
+  <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/final-performance-profiling-result.png" />
+  <figcaption style={{ margin: 0, color: 'grey' }}>
+    Final Chrome Performance Profiling Result
+  </figcaption>
+</figure>
+
+- JS Heap: ±7.5MB (-74%)
+- Documents: ±0개 (-100%)
+- Nodes: ±376개 (-97%)
+- Listeners: ±30개 (-25%)
+
+대부분의 항목에서 성능 개선을 이뤘다. 아직 Nodes의 그래프가 계단식을 띄긴 하기 때문에 더 개선할 여지가 있지만, 여기까지 개선했을 때 유저에게 심각하게 느껴질 정도로 문제가 되지 않는다고 판단하였다.
+
+# Recap
+
+이번 포스팅에서는 Chrome DevTools를 활용하여 메모리릭 이슈를 해결한 과정을 소개하였다. 여기서 해결한 문제와 각각에 해당하는 진단 및 해결 방법은 다음과 같다.
+
+- **JS Heap memory leak**
+  - **Memory Allocation Timeline**으로 진단 후 Lottie 애니메이션 인스턴스가 unmount시에 destroy 되도록하여 해결
+- **Event Listeners memory leak**
+  - **Chrome Performance Profiling**으로 진단 후 Lottie 애니메이션 인스턴스의 이벤트 리스너가 unmount시에 remove 되도록하여 해결
+- **detached DOM memory leak**
+  - **Chrome Memory Heap Snapshots**로 진단 후 문제가 있는 `<SvgIcon />` 컴포넌트를 별도 svg 컴포넌트로 교체하여 해결
+
+# Footnotes
+
+<a name="detached_dom">1.</a>
+현재 페이지에서 더 이상 존재하지 않지만 JS에 의해 여전히 참조되고 있는 DOM element를 말한다. 브라우저가
+이러한 detached DOM들을 GC로 수직하기 위해선, JS의 참조를 해제해주어야 한다.
+
+<a name="retained_size">2.</a>
+Retained size는 특정 객체에 의해 접근할 수 있는 객체들의 Shallow Size<sup>[[3]](#shallow_size)</sup>의
+합이다. 즉 해당 객체가 GC에 의해 수집될 때 GC가 해제할 메모리 양을 나타낸다.
+
+<a name="shallow_size">3.</a>
+오브젝트 스스로 들고있는 메모리이다. 일반적으로 string, array만이 significant shallow size 메모리를 차지할
+수 있다.
+
+# References
+
+- [https://developer.chrome.com/docs/devtools/memory-problems/heap-snapshots/](https://developer.chrome.com/docs/devtools/memory-problems/heap-snapshots/)
+- [https://developer.chrome.com/docs/devtools/memory-problems/memory-101/](https://developer.chrome.com/docs/devtools/memory-problems/memory-101/)
+- [자바스크립트에서-메모리-누수의-4가지-형태](https://itstory.tk/entry/%EC%9E%90%EB%B0%94%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8%EC%97%90%EC%84%9C-%EB%A9%94%EB%AA%A8%EB%A6%AC-%EB%88%84%EC%88%98%EC%9D%98-4%EA%B0%80%EC%A7%80-%ED%98%95%ED%83%9C)
+- [https://engineering.linecorp.com/ko/blog/vue-memory-leak-analysis/](https://engineering.linecorp.com/ko/blog/vue-memory-leak-analysis/)
+- [http://slides.com/gruizdevilla/memory#/9](http://slides.com/gruizdevilla/memory#/9)
+- [https://v2.vuejs.org/v2/cookbook/avoiding-memory-leaks.html#Resolving-the-Memory-Leak](https://v2.vuejs.org/v2/cookbook/avoiding-memory-leaks.html#Resolving-the-Memory-Leak)
+- [https://ui.toast.com/weekly-pick/ko_20210611](https://ui.toast.com/weekly-pick/ko_20210611)
