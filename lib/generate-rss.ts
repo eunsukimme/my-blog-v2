@@ -5,9 +5,9 @@ import { PostFrontMatter } from 'types/PostFrontMatter'
 
 const generateRssItem = (post: PostFrontMatter) => `
   <item>
-    <guid>${siteMetadata.siteUrl}/blog/${post.slug}</guid>
+    <guid>${siteMetadata.siteUrl}/posts/${post.slug}</guid>
     <title>${escape(post.title)}</title>
-    <link>${siteMetadata.siteUrl}/blog/${post.slug}</link>
+    <link>${siteMetadata.siteUrl}/posts/${post.slug}</link>
     ${post.summary && `<description>${escape(post.summary)}</description>`}
     <pubDate>${new Date(post.date).toUTCString()}</pubDate>
     <author>${siteMetadata.email} (${siteMetadata.author})</author>
@@ -19,7 +19,7 @@ const generateRss = (posts: PostFrontMatter[], page = 'feed.xml') => `
   <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
     <channel>
       <title>${escape(siteMetadata.title)}</title>
-      <link>${siteMetadata.siteUrl}/blog</link>
+      <link>${siteMetadata.siteUrl}/posts</link>
       <description>${escape(siteMetadata.description)}</description>
       <language>${siteMetadata.language}</language>
       <managingEditor>${siteMetadata.email} (${siteMetadata.author})</managingEditor>
