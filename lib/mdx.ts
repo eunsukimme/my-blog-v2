@@ -40,13 +40,7 @@ export function dateSortDesc(a: string, b: string) {
   return 0
 }
 
-export async function getFileBySlug<T>(type: 'authors' | 'blog', slug: string | string[]) {
-  const mdxPath = path.join(root, 'data', type, `${slug}.mdx`)
-  const mdPath = path.join(root, 'data', type, `${slug}.md`)
-  const source = fs.existsSync(mdxPath)
-    ? fs.readFileSync(mdxPath, 'utf8')
-    : fs.readFileSync(mdPath, 'utf8')
-
+export async function makeMDX(source: string) {
   // https://github.com/kentcdodds/mdx-bundler#nextjs-esbuild-enoent
   if (process.platform === 'win32') {
     process.env.ESBUILD_BINARY_PATH = path.join(root, 'node_modules', 'esbuild', 'esbuild.exe')
@@ -55,7 +49,6 @@ export async function getFileBySlug<T>(type: 'authors' | 'blog', slug: string | 
   }
 
   const toc: Toc = []
-
   // Parsing frontmatter here to pass it in as options to rehype plugin
   const { data: frontmatter } = matter(source)
   const { code } = await bundleMDX({
@@ -98,6 +91,53 @@ export async function getFileBySlug<T>(type: 'authors' | 'blog', slug: string | 
   })
 
   return {
+    frontmatter,
+    code,
+    toc,
+  }
+}
+
+export async function getFileBySlug(slug: string) {
+  const prefixPaths = path.join(root, 'data', 'blog')
+  const fileNames = getAllFilesRecursively(prefixPaths)
+  const fileName = fileNames.find((fileName) => {
+    // Replace is needed to work on Windows
+    const _fileName = fileName.slice(prefixPaths.length + 1).replace(/\\/g, '/')
+    // Remove Unexpected File
+    if (path.extname(_fileName) !== '.md' && path.extname(_fileName) !== '.mdx') {
+      return
+    }
+    const source = fs.readFileSync(fileName, 'utf8')
+    const matterFile = matter(source)
+    const frontmatter = matterFile.data as PostFrontMatter
+    return frontmatter.slug === slug
+  })
+
+  const source = fs.readFileSync(fileName, 'utf8')
+  const { frontmatter, code, toc } = await makeMDX(source)
+
+  return {
+    mdxSource: code,
+    toc,
+    frontMatter: {
+      readingTime: readingTime(code),
+      slug: slug || null,
+      ...frontmatter,
+      date: frontmatter.date ? new Date(frontmatter.date).toISOString() : null,
+    },
+  }
+}
+
+export async function getFileByFileName<T>(type: 'authors' | 'blog', slug: string | string[]) {
+  const mdxPath = path.join(root, 'data', type, `${slug}.mdx`)
+  const mdPath = path.join(root, 'data', type, `${slug}.md`)
+  const source = fs.existsSync(mdxPath)
+    ? fs.readFileSync(mdxPath, 'utf8')
+    : fs.readFileSync(mdPath, 'utf8')
+
+  const { frontmatter, code, toc } = await makeMDX(source)
+
+  return {
     mdxSource: code,
     toc,
     frontMatter: {
@@ -130,7 +170,7 @@ export async function getAllFilesFrontMatter(folder: 'blog') {
     if ('draft' in frontmatter && frontmatter.draft !== true) {
       allFrontMatter.push({
         ...frontmatter,
-        slug: formatSlug(fileName),
+        slug: frontmatter.slug || formatSlug(fileName),
         date: frontmatter.date ? new Date(frontmatter.date).toISOString() : null,
       })
     }
