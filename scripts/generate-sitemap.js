@@ -1,7 +1,9 @@
 const fs = require('fs')
+const path = require('path')
 const globby = require('globby')
 const prettier = require('prettier')
 const siteMetadata = require('../data/siteMetadata')
+const matter = require('gray-matter')
 
 ;(async () => {
   const prettierConfig = await prettier.resolveConfig('./.prettierrc.js')
@@ -19,23 +21,33 @@ const siteMetadata = require('../data/siteMetadata')
         <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
             ${pages
               .map((page) => {
-                const path = page
-                  .replace('pages/', '/')
-                  .replace('data/blog', '/posts')
-                  .replace('public/', '/')
-                  .replace('.js', '')
-                  .replace('.mdx', '')
-                  .replace('.md', '')
-                  .replace('/feed.xml', '')
-                const route = path === '/index' ? '' : path
-                if (page === `pages/404.js` || page === `pages/posts/[...slug].js`) {
-                  return
-                }
-                return `
+                if (page.includes('mdx')) {
+                  const source = fs.readFileSync(path.join(process.cwd(), page), 'utf8')
+                  const frontMatter = matter(source).data
+                  return `
+                        <url>
+                            <loc>${siteMetadata.siteUrl}/posts/${frontMatter.slug}</loc>
+                        </url>
+                    `
+                } else {
+                  const replacedPage = page
+                    .replace('pages/', '/')
+                    .replace('data/blog', '/posts')
+                    .replace('public/', '/')
+                    .replace('.js', '')
+                    .replace('.mdx', '')
+                    .replace('.md', '')
+                    .replace('/feed.xml', '')
+                  const route = replacedPage === '/index' ? '' : replacedPage
+                  if (page === `pages/404.js` || page === `pages/posts/[...slug].js`) {
+                    return
+                  }
+                  return `
                         <url>
                             <loc>${siteMetadata.siteUrl}${route}</loc>
                         </url>
                     `
+                }
               })
               .join('')}
         </urlset>
