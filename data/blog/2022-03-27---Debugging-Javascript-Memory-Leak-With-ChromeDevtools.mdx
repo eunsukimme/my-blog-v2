@@ -197,9 +197,49 @@ Listeners 그래프도 GC가 돌때 JS Heap과 함께 감소하는 것을 확인
 # Comparison
 
 이렇게 해서 3가지 메모리 이슈를 모두 해결했다. 여기까지 디버깅을 진행하면서 얼마만큼의 메모리 사용량이 개선되었는지 측정해보았다.
-라이브 클래스룸에서 카메라 영역을 총 10번 페이지네이션 할 경우의 Chrome performance profiling 결과를 비교하면 다음과 같다.
+라이브 클래스룸에서 카메라 영역을 총 10번 페이지네이션 할 경우의 Heap Snapshots, Allocation Timeline, Chrome performance profiling 결과를 비교하면 다음과 같다.
 
-## Before
+## Heap Snapshots - Before
+
+<figure>
+  <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/memory-heap-snapshot-compare-before.png" />
+</figure>
+
+| 항목          | 스냅샷 1 | 스냅샷 2 | 델타(Δ)   |
+| ------------- | -------- | -------- | --------- |
+| Heap Snapshot | 124MB    | 169MB    | **+45MB** |
+
+## Heap Snapshots - After
+
+<figure>
+  <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/memory-heap-snapshot-compare-after.png" />
+</figure>
+
+| 항목          | 스냅샷 1 | 스냅샷 2 | 델타(Δ)         |
+| ------------- | -------- | -------- | --------------- |
+| Heap Snapshot | 127MB    | 118MB    | **-9MB(-120%)** |
+
+## Allocation Timeline - Before
+
+<figure>
+  <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/memory-allocation-timeline-compare-before.png" />
+</figure>
+
+| 항목              | 델타(Δ)   |
+| ----------------- | --------- |
+| Memory Allocation | **+31MB** |
+
+## Allocation Timeline - After
+
+<figure>
+  <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/memory-allocation-timeline-compare-after.png" />
+</figure>
+
+| 항목              | 델타(Δ)          |
+| ----------------- | ---------------- |
+| Memory Allocation | **+990KB(-96%)** |
+
+## Performance Profile - Before
 
 <figure>
   <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/performance-profiling-result-compare-before.png" />
@@ -215,7 +255,7 @@ Listeners 그래프도 GC가 돌때 JS Heap과 함께 감소하는 것을 확인
 | Nodes     | 3307개          | 17243개               | **+13936개** |
 | Listeners | 459개           | 499개                 | **+40개**    |
 
-## After
+## Performance Profile - After
 
 <figure>
   <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/performance-profiling-result-compare-after.png" />
@@ -227,11 +267,13 @@ Listeners 그래프도 GC가 돌때 JS Heap과 함께 감소하는 것을 확인
 | 항목      | GC 후 초기 상태 | 페이지네이션 및 GC 후 | 델타(Δ)          |
 | --------- | --------------- | --------------------- | ---------------- |
 | JS Heap   | 94MB            | 91MB                  | **-3MB(-100%)**  |
-| Documents | 5개             | 6개                   | **+1개(-90%)**   |
+| Documents | 5개             | 5개                   | **+0개(-100%)**  |
 | Nodes     | 4507개          | 5041개                | **+534개(-96%)** |
 | Listeners | 473개           | 473개                 | **+0개(-100%)**  |
 
-대부분의 항목에서 큰 메모리 성능 개선을 이뤘다. 아직 Nodes의 그래프가 계단식을 띄긴 하기 때문에 더 개선할 여지가 있지만, 여기까지 개선했을 때 유저에게 심각하게 느껴질 정도로 문제가 되지 않는다고 판단되었다.
+대부분의 항목에서 큰 메모리 성능 개선을 이뤘다. 그러나 아직 Nodes의 그래프가 여전히 계단식을 띄고 있다.
+벌써 눈치챈 분도 있겠지만 Heap Snapshots, Allocation Timeline에서 이제는 Vue Component가 문제가 되는 걸 확인할 수 있다.
+때문에 아직 더 개선할 여지가 있지만, 여기까지 개선했을 때 유저에게 심각하게 느껴질 정도로 문제가 되지 않는다고 판단되었다.
 
 # Recap
 
@@ -240,7 +282,7 @@ Listeners 그래프도 GC가 돌때 JS Heap과 함께 감소하는 것을 확인
 - **JS Heap memory leak**
   - **Memory Allocation Timeline**으로 진단 후 Lottie 애니메이션 인스턴스가 unmount시에 destroy 되도록하여 해결
 - **Event Listeners memory leak**
-  - **Chrome Performance Profiling**으로 진단 후 Lottie 애니메이션 인스턴스의 이벤트 리스너가 unmount시에 remove 되도록하여 해결
+  - **Chrome Performance Profiling**으로 진단 후 Lottie 애니메이션 인스턴스에 추가한 이벤트 리스너가 unmount시에 remove 되도록하여 해결
 - **detached DOM memory leak**
   - **Chrome Memory Heap Snapshots**로 진단 후 문제가 있는 `<SvgIcon />` 컴포넌트를 별도 svg 컴포넌트로 교체하여 해결
 
