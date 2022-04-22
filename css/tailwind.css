@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+figcaption {
+  margin-top: -1rem !important;
+}
+
 .task-list-item::before {
   @apply hidden;
 }

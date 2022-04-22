@@ -1,7 +1,8 @@
 ---
 title: Chrome DevTools로 JS 메모리 누수(Memory Leak) 디버깅하기
 summary: Chrome DevTools를 활용하여 Javascript 메모리 누수를 디버깅 한 경험을 기록합니다.
-date: '2022-03-27T20:00:00.000Z'
+date: '2022-03-27T20:00:00+09:00'
+lastmod: '2022-04-23T00:15:00+09:00'
 draft: false
 slug: 'debugging-javascript-memory-leak-with-chrome-devtools'
 category: javascript
@@ -10,11 +11,11 @@ tags:
   - browser
   - chrome
   - memoryleak
-socialImage: '/social_image.png'
+images: ['/static/media/debugging-javascript-memory-leak-with-chrome-devtools/social-image.png']
 ---
 
 회사에서 만드는 웹앱에 메모리 누수가 생기는 이슈가 있었는데, 이 이슈를 해결한 과정을 기록하고자 한다.
-이번 포스팅에서는 JS의 메모리 구조, Chrome DevTools의 메모리 관련 기능들, 그리고 메모리 누수 진단 및 해결 방법에 대해 소개하고자 한다.
+이번 포스팅에서는 Chrome DevTools의 메모리 관련 기능들, 그리고 메모리 누수 진단 및 해결 방법에 대해 소개하고자 한다.
 
 # Intro
 
@@ -41,7 +42,7 @@ socialImage: '/social_image.png'
 
 ### 2. 페이지가 일관되게 느리다
 
-페이지가 처음부터 느리다고 느껴진다면, 이는 Memory bloat(한국어로 무엇이라 부르는진 모르겠다)으로 볼 수 있다. Memory bloat은 페이지가 최적화된 속도에 필요한 메모리보다 기본적으로 더 많은 메모리를 사용하는 것을 말한다.
+페이지가 처음부터 느리다고 느껴진다면, 이는 Memory bloat으로 볼 수 있다. Memory bloat은 페이지가 최적화된 속도에 필요한 메모리보다 기본적으로 더 많은 메모리를 사용하는 것을 말한다.
 
 ### 3. 페이지가 뚝 뚝 끊긴다
 
@@ -83,6 +84,12 @@ GC가 돌면 모든 JS 스크립트의 실행이 중지된다. 즉, GC가 자주
 # Chrome performance profiling
 
 Chrome DevTools에서 **Performance** > **Memory 체크박스** 선택(활성화) 후 Record 버튼을 누르면 시간에 따른 메모리 사용량을 시각화해서 보여준다.
+
+<figure>
+  <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/chrome-devtools-performance-tab.png" />
+  <figcaption style={{ margin: 0, color: 'grey' }}>Chrome DevTools의 Performance 탭</figcaption>
+</figure>
+
 Record 버튼을 누르고 페이지네이션을 여러번 수행해본 다음 stop 버튼을 눌러 중지해보니, 다음과 같은 결과가 나왔다.
 
 <figure>
@@ -101,7 +108,16 @@ Record 버튼을 누르고 페이지네이션을 여러번 수행해본 다음 s
 # Debugging JS heap memory leak with Allocation Timeline
 
 JS Heap에서 발생한 메모리릭을 살펴보려면 Chrome DevTools에서 **Memory** > **Profiles** > **Allocation instrumentation on timeline** 을 선택한 뒤 `Start` 버튼을 눌러
-분석을 시작할 수 있다. 메모리릭을 발생시킬 것으로 의심되는 액션을 몇 차례 수행한 뒤, `Stop` 버튼을 눌러 분석을 종료하니 다음과 같은 화면을 볼 수 있었다.
+분석을 시작할 수 있다.
+
+<figure style={{ maxWidth: '500px' }}>
+  <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/chrome-devtools-memory-tab-allocation-timeline.png" />
+  <figcaption style={{ margin: 0, color: 'grey' }}>
+    Chrome DevTools의 Memory 탭 - Heap Allocation Timeline 기능
+  </figcaption>
+</figure>
+
+메모리릭을 발생시킬 것으로 의심되는 액션을 몇 차례 수행한 뒤, `Stop` 버튼을 눌러 분석을 종료하니 다음과 같은 화면을 볼 수 있었다.
 
 <figure>
   <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/first-memory-allocation-timeline-result.png" />
@@ -159,6 +175,13 @@ Listeners 그래프도 GC가 돌때 JS Heap과 함께 감소하는 것을 확인
 
 마지막으로 detached DOM 문제를 해결하기 위해 Chrome DevTools에서 **Memory** > **Profiles** > **Heap Snapshots** 을 선택한 뒤 `Take snapshot` 버튼을 눌러
 해당 시점의 JS와 DOM 노드 사이의 메모리가 어떻게 분배되어 있는지 확인할 수 있다.
+
+<figure style={{ maxWidth: '500px' }}>
+  <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/chrome-devtools-memory-tab-heap-snapshot.png" />
+  <figcaption style={{ margin: 0, color: 'grey' }}>
+    Chrome DevTools의 Memory 탭 - Heap Snapshot 기능
+  </figcaption>
+</figure>
 
 <figure>
   <img src="/static/media/debugging-javascript-memory-leak-with-chrome-devtools/first-memory-heap-snatshot.png" />
@@ -273,7 +296,7 @@ Listeners 그래프도 GC가 돌때 JS Heap과 함께 감소하는 것을 확인
 
 대부분의 항목에서 큰 메모리 성능 개선을 이뤘다. 그러나 아직 Nodes의 그래프가 여전히 계단식을 띄고 있다.
 벌써 눈치챈 분도 있겠지만 Heap Snapshots, Allocation Timeline에서 이제는 Vue Component가 문제가 되는 걸 확인할 수 있다.
-때문에 아직 더 개선할 여지가 있지만, 여기까지 개선했을 때 유저에게 심각하게 느껴질 정도로 문제가 되지 않는다고 판단되었다.
+여기서 언급하진 않았지만 이후에 Vue Component로 인한 메모리 누수도 위에서 소개한 도구를 활용하여 진단하고 해결하였다.
 
 # Recap
 
