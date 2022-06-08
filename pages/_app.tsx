@@ -10,7 +10,6 @@ import Analytics from '@/components/analytics'
 import LayoutWrapper from '@/components/LayoutWrapper'
 import { ClientReload } from '@/components/ClientReload'
 import { useEffect } from 'react'
-import GoogleAdsense from '@/components/adsense/GoogleAdsense'
 
 const isDevelopment = process.env.NODE_ENV === 'development'
 const isSocket = process.env.SOCKET
@@ -32,7 +31,6 @@ export default function App({ Component, pageProps }: AppProps) {
       <Head>
         <meta content="width=device-width, initial-scale=1" name="viewport" />
       </Head>
-      <GoogleAdsense />
       {isDevelopment && isSocket && <ClientReload />}
       <Analytics />
       <LayoutWrapper>
