@@ -8,7 +8,7 @@ const ContentSecurityPolicy = `
   script-src 'self' 'unsafe-eval' 'unsafe-inline' *.googletagmanager.com *.google-analytics.com giscus.app codesandbox.io;
   style-src 'self' 'unsafe-inline' *.googleapis.com cdn.jsdelivr.net;
   img-src * blob: data:;
-  media-src 'none';
+  media-src *.githubusercontent.com;
   connect-src *;
   font-src 'self' fonts.gstatic.com cdn.jsdelivr.net;
   frame-src giscus.app codesandbox.io
