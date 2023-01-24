@@ -43,16 +43,15 @@ element.props.children.forEach((child) => render(child, dom))
 
 Compositor thread는 레이어 타일을 계산하는 [Composite](https://developers.google.com/web/updates/2018/09/inside-browser-part3#compositing)작업을 수행하고 Raster(Comopsitor Tile Worker) thread는 paint record를 바탕으로 실제 paint를 수행하는 [Rasterize](https://developers.google.com/web/updates/2018/09/inside-browser-part3#raster_and_composite_off_of_the_main_thread)작업을 수행한다. 마지막으로 GPU 프로세스의 GPU 스레드가 레이어 및 타일을 화면에 표시하면 비로소 HTML이 픽셀로 나타나게 된다.
 
-위 과정을 일반적으로 다음과 같이 [5단계](https://developers.google.com/web/fundamentals/performance/rendering/#the_pixel_pipeline)로 구분하여 표현한다,
+위 과정을 일반적으로 다음과 같이 [5단계](https://web.dev/rendering-performance/#the-pixel-pipeline)로 구분하여 표현한다,
 
 <figure>
   <img
-    src="https://developers.google.com/web/fundamentals/performance/rendering/images/intro/frame-full.jpg"
+    src="https://web-dev.imgix.net/image/T4FyVKpzu4WKF1kBNvXepbi08t52/gfQC4uOnIbLVtkdvbSY4.jpg"
     alt="Pixel Pipeline"
   />
   <figcaption style={{ color: 'grey' }}>
-    Pixel Pipeline(출처:
-    https://developers.google.com/web/fundamentals/performance/rendering/#the_pixel_pipeline)
+    Pixel Pipeline(출처: https://web.dev/rendering-performance/#the-pixel-pipeline)
   </figcaption>
 </figure>
 
@@ -64,11 +63,11 @@ Compositor thread는 레이어 타일을 계산하는 [Composite](https://develo
 
 <figure>
   <img
-    src="https://developers.google.com/web/updates/images/inside-browser/part3/pagejank2.png"
+    src="https://wd.imgix.net/image/T4FyVKpzu4WKF1kBNvXepbi08t52/FryonpF90Ei9JYYGi1UI.png"
     alt="page jank"
   />
   <figcaption style={{ color: 'grey' }}>
-    Page jank(출처: https://developers.google.com/web/updates/2018/09/inside-browser-part3)
+    Page jank(출처: https://developer.chrome.com/blog/inside-browser-part3/)
   </figcaption>
 </figure>
 
@@ -128,7 +127,7 @@ Fiber를 도입하는 목적은 단순하다. 언제든지 렌더링 작업을 �
 
 <figure style={{ backgroundColor: '#202226' }}>
   <img
-    src="https://pomb.us/static/a88a3ec01855349c14302f6da28e2b0c/ac667/fiber1.png"
+    src="https://pomb.us/static/a88a3ec01855349c14302f6da28e2b0c/d3fa7/fiber1.png"
     alt="Fiber tree"
   />
   <figcaption style={{ color: 'white' }}>
