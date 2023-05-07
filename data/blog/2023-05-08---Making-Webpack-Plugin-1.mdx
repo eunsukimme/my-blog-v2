@@ -1,0 +1,156 @@
+---
+title: 'Webpack 플러그인 만들기(1) - Webpack 내부 동작 원리 이해'
+summary: Webpack 플러그인을 만들기 위해 먼저 webpack 내부 동작 원리를 이해합니다
+date: '2023-05-08T00:00:00.000Z'
+draft: false
+slug: 'making-webpack-plugin-1-how-webpack-works'
+category: Frontend
+tags:
+  - Frontend
+  - javascript
+  - webpack
+socialImage: '/social_image.png'
+---
+
+# Background
+
+이 글을 작성하게 된 배경에 대해 먼저 언급하려고 한다. 내용이 조금 있기 떄문에 이 글이 작성된 배경이 별로 궁금하지 않다면 바로 넘어가도 좋다.
+
+현재 회사에서는 Ruby on Rails와 Vue로 만들어진 웹 애플리케이션을 하나의 코드베이스에서 관리하고 있다. 그래서 적은 코드를 수정하고 배포하려고 해도 전체 애플리케이션을 빌드하고 배포해야 해서 시간이 오래 걸렸다. 이런 환경에서 특히 프론트엔드 개발자들이 생산성이 저해된다고 느꼈고, 전사 개발자들과 얼라인되어 프론트엔드 코드베이스를 별도로 관리할 수 있도록 새로운 레포지토리를 만들고 거기서 새로운 웹 애플리케이션을 개발하도록 했다. 이 작업과 관련해서 자세한 내용이 궁금하다면 AWSKRUG 프론트엔드 소모임에서 발표한 [영상](https://youtu.be/M6njEpzPicE)을 보면 좋겠다.
+
+이와 같은 맥락으로, 기존 코드베이스에서 Vue 애플리케이션을 새로운 프론트엔드 코드베이스로 이전하는 작업도 함께 진행했었다. 기존 Vue 코드를 그대로 새로운 레포지토리로 옮기는 것이라 어렵지 않을 것이로 생각했지만, 실제로는 Vue 코드가 거대해서 옮겨야 할 코드를 파악하기 힘들었다. 그래서 방법을 고민하다가, Ruby on Rails가 Vue 코드를 번들링하기 위해 webpacker 라는 내장 webpack을 사용한다는 사실을 알게됐고, webpack은 번들링 과정에서 dependency graph를 알 수 있기 때문에 애플리케이션에 필요한 소스코드가 무엇인지 파악할 수 있다는 생각이 들었다. 그래서 webpack을 활용하여 번들링에 필요한 소스코드를 그대로 복사할 수 있는 플러그인을 찾아보게 되었다.
+
+찾아보니 [webpack-emit-all-plugin](https://github.com/DrewML/webpack-emit-all-plugin)이라는 플러그인이 있었는데, 내가 찾던 역할을 정확히 수행하지만 왜인지 동작하지 않았고, 2019년부터 이슈가 올라왔지만, 여전히 고쳐지지 않고 있었다. 또 [copy-webpack-plugin](https://github.com/webpack-contrib/copy-webpack-plugin)이란 webpack 커뮤니티 공식 플러그인이 존재했는데, 오직 특정 파일이나 디렉토리만을 복사할 수 있어서 내가 원하는 동작과는 조금 달랐다. webpack이 자체적으로 지원하진 않는지 이슈를 살펴보니 server-side 환경의 경우 webpack이 컴파일할 때 번들링하지 않도록 하는 기능을 제공해 달란 [이슈](https://github.com/webpack/webpack/issues/5866)가 올라와 있었다. 나의 경우 완전히 같은 목적은 아니지만, 번들링하지 않은 코드를 기존과 동일한 디렉토리 구조를 유지한 채 output으로 뽑아내고 싶다는 점에서 유사한 니즈가 있다고 생각했다.
+
+그리하여 나는 주어진 entry 포인트로부터 사용되는 소스코드를 동일한 디렉토리 구조로 output으로 뽑아낼 수 있는 webpack 플러그인을 만들기로 하였다. 그래서 webpack core 팀의 Sean Larkin이 webpack이 어떻게 동작하는지 소개하는 영상([Everything's a Plugin](https://youtu.be/xse6JKcfbzs))을 바탕으로 공부하고 플러그인을 만든 과정에서 내가 알게 된 내용을 정리해두고자 한다. 다루고자 하는 내용이 많아 2편으로 나눠 1편에선 webpack의 동작원리에 대해 다루고 2편에서 webpack 플러그인을 만드는 내용을 다루어 보려고 한다.
+
+# Webpack 동작 원리
+
+Webpack을 한마디로 정의하면 event-driven, plugin architecture로 이뤄진 여러 플러그인의 집합이다. 내가 본 영상에서도 "Everything's a Plugin"이란 제목으로 webpack을 소개하는데 처음에는 잘 이해하지 못했지만, 지금 생각해 보면 정말 깔끔하게 한 문장으로 정리했단 생각이 든다. 왜냐고? 지금부터 이해해 보자.
+
+## Webpack의 중심에는 tapable이 있다
+
+Webpack은 내부적으로 [tapable](https://github.com/webpack/tapable)이라는 pub-sub 라이브러리를 기반으로 한다. 이 라이브러리는 몇 가지 hook을 제공하고, 이 훅을 사용해서 pub-sub 구조를 쉽게 만들 수 있다. 이를 'tapable instance'라고 한다. 아래 코드는 tapable의 README에 나와 있는 코드를 이해하기 쉽게 각색한 것이다.
+
+```jsx
+class Car {
+  constructor() {
+    this.hooks = {
+      accelerate: new SyncHook(['newSpeed']),
+    }
+  }
+  setSpeed(newSpeed) {
+    this.hooks.accelerate.call(newSpeed)
+  }
+}
+
+const myCar = new Car()
+// accelerate 이벤트가 발생하면 실행될 콜백 함수를 등록한다.
+myCar.hooks.accelerate.tap('LoggerPlugin', (newSpeed) => console.log(`Accelerating to ${newSpeed}`))
+myCar.setSpeed(100) // "Accelerating to 100"
+```
+
+Car 클래스는 `accelerate`라는 `SyncHook`을 제공하고 있다. 이 hook을 tap 하는 `LoggerPlugin`은 `newSpeed` 값을 받아 `console.log()` 로 출력한다. 이것이 바로 webpack과 webpack 플러그인이 동작하는 원리다. 이 예제에서 Car는 webpack 컴파일러고, `LoggerPlugin`이 webpack 플러그인이다. 아직 감이 오지 않는가? Webpack은 tapable을 기반으로 만들어졌기 때문에 webpack [컴파일러 코드](https://github.com/webpack/webpack/blob/46cdedb4ba67aa75ccb00919e6cc8594d7445146/lib/Compiler.js#L119)를 보면 위처럼 여러 hook이 존재하는 것을 볼 수 있다.
+
+<figure>
+  <img src="/static/media/making-webpack-plugin-1/webpack-compiler-code.png" width={600} />
+  <figcaption style={{ color: 'grey' }}>webpack compiiler 코드</figcaption>
+</figure>
+
+Webpck은 컴파일러이고, 이 컴파일러는 보다시피 컴파일 과정에서 실행되는 여러 단계의 hook을 제공하고 있다. 이 hook을 webpack 플러그인들이 subscribe 하는 구조인 것이다. 그리고 webpack은 내부적으로도 이 hook에 의존하는 매우 많은 플러그인의 집합으로 이루어져 있다. [WebpackOptionsApply.js](https://github.com/webpack/webpack/blob/main/lib/WebpackOptionsApply.js) 코드를 보면 다음과 같이 compiler의 동작도 플러그인으로 제어되는 것을 볼 수가 있다.
+
+<figure>
+  <img src="/static/media/making-webpack-plugin-1/webpackOptionsApply.png" />
+  <figcaption style={{ color: 'grey' }}>webpackOptionsApply.js 코드 일부</figcaption>
+</figure>
+
+어떤가? 이제 'Everything's a Plugin' 이라는 말이 좀 이해될 것이다. Webpack은 event-driven, plugin architecture로 동작하는 컴파일러였던 것이다.
+
+## Webpack의 내부 구성 요소
+
+Webpack의 내부는 다음과 같이 6가지로 구분할 수 있다. 참고로 아래 요소들은 모두 tapable instance이다.
+
+### Compiler
+
+webpack에서 가장 핵심인 역할. 컴파일의 시작과 끝을 관장하고 Node API로 외부에 제공된다.
+
+```jsx
+const webpack = require('webpack')
+const compiler = webpack(config) // this is compiler instance!
+```
+
+### Compilation
+
+컴파일러에 의해 생성된 디펜던시 그래프(dependency graph)이다. 어떤 소스 코드가 어떻게 사용되는지 webpack이 이해할 수 있는 자료구조이다.
+
+### Resolver
+
+Node.js에서 모듈을 resolve 할 때 사용하는 그 단어 맞다. partial path를 받아서 absolute path로 변환시키고 실제로 파일 시스템에 존재하는 파일인지 확인하는 역할을 담당한다.
+
+### ModuleFactory
+
+이름 그대로 Module을 생성해 내는 팩토리이다. Resolver에게 module을 resolve 해달라는 request를 보내고 응답을 받는데 성공하면 응답에 포함된 소스 코드를 바탕으로 모듈 오브젝트를 생성한다.
+
+### Parser
+
+ModuleFactory가 만들어 낸 모듈 오브젝트를 받아서 파싱하여 AST(Abstact Syntax Tree)를 만들어 낸다. 해당 AST에 포함된 import, require, dynamic import 구문을 찾아서 해당 모듈 오브젝트의 디펜던시로 마킹한다.
+
+### Template
+
+<aside>
+⚠️ **Webpack 5 버전부터 Main/Chunk/Module template은 deprecated 되었다. 대신 비슷한 역할을 하는 JavascriptModulesPlugin이 사용된다.** 자세한 내용은 공식 문서의 [migration guide](https://webpack.js.org/blog/2020-10-10-webpack-5-release/#mainchunkmoduletemplate-deprecation)를 참고하자. 그치만 compat-layer가 존재하기 때문에 여전히 template을 사용 가능하고, 개념적으로 동일한 역할을 하기 때문에 여기선 template에 대한 내용도 기술해두겠다.
+
+</aside>
+
+일반적으로 얘기하는 그 템플릿 맞다(ex. Vue의 template). 일반적으로 템플릿은 data binding이 가능한 view representation이고, rendering 되어 최종 결과물이 만들어진다. webpack의 경우에서는 template에 module이 data binding된다. 그리고 rendering 되면 최종적으로 번들 코드가 만들어진다.
+
+<figure>
+  <img src="/static/media/making-webpack-plugin-1/webpack-template.png" />
+  <figcaption style={{ color: 'grey' }}>
+    Everything's a Plugin 영상에서 발췌한 template 설명 슬라이드
+  </figcaption>
+</figure>
+
+template에는 Main, Chunk, Module, Dependency template이 존재한다. main/chunk 안에 여러 module이 존재할 수 있고, module 안에 여러 dependency가 존재할 수 있다. 이러한 것들이 각 template에 바인딩되고, 각 template의 render function에 의해 source code string으로 변환될 수 있다. 이 string이 최종 bundle code가 되는 것이다. 이를 JSX로 표현한다면 다음과 같다.
+
+<figure>
+  <img src="/static/media/making-webpack-plugin-1/webpack-template-jsx.png" />
+  <figcaption style={{ color: 'grey' }}>
+    Everything's a Plugin 영상에서 발췌한 template을 JSX로 표현한 슬라이드
+  </figcaption>
+</figure>
+
+## Webpack 컴파일 과정
+
+Webpack의 핵심 구성요소들을 살펴봤으니, 이제 이러한 요소들이 어떻게 상호작용해서 컴파일 하고 dependency graph를 만들어내는지 살펴보도록 하자. 이 과정을 그림으로 나타내면 다음과 같다.
+
+<figure>
+  <img src="/static/media/making-webpack-plugin-1/webpack-compile-process.png" />
+  <figcaption style={{ color: 'grey' }}>
+    Everything's a Plugin 영상에서 발췌한 webpack의 컴파일 프로세스
+  </figcaption>
+</figure>
+
+1. 맨 처음에 컴파일러에게 config(option) 파일이 주어지면서 시작된다. compiler는 option에 기술된 entry point(ex. `./src/index.js`)를 시작으로 하는 compilation(dependency graph)를 생성하고 본격적으로 컴파일하기 시작한다. 먼저 entry point에 해당하는 모듈을 resolve 해야 한다.
+2. 해당 모듈을 resolve하기 위해 ModuleFactory를 거쳐 Resolver에게 request를 보낸다. Resolver는 request로 받은 모듈의 partial path를 absolute path로 변경하여(ex. `/Users/foo/code/src/index.js`) 해당 파일의 존재를 확인하고, 해당하는 파일을 읽어 모듈 오브젝트를 반환한다.
+3. Parser는 해당 모듈 오브젝트를 바탕으로 AST를 생성하고, AST를 walk 하면서 해당 모듈 오브젝트에 포함된 dependency들을 찾아내어 마킹한다.
+4. 해당 모듈 오브젝트에 포함된 dependency가 resolve 되지 않았다면, dependency에 해당하는 모듈을 resolve 하기 위해 2-4과정을 반복한다. 모듈 오브젝트에 dependency가 더 이상 포함되지 않을 때까지 이를 반복한다.
+5. 모든 dependency graph가 만들어지면 template에 각 모듈을 binding하고 render 시켜서 최종적으로 번들 소스 코드를 생성해 낸다.
+
+이렇게 하여 생성된 dependency graph를 브라우저에서 어떻게 실행되는지에 대해서도 궁금하다면 '[Everything's a Plugin](https://youtu.be/xse6JKcfbzs?t=964)' 영상에 해당하는 설명도 존재하니 참고하면 좋겠다.
+
+# Recap
+
+이번 포스팅에서는 webpack이 어떤 구성요소와 아키텍처로 이루어져 있으며 어떻게 동작하는지 살펴보았다. 여기서 다룬 내용을 요약하면 다음과 같다.
+
+- webpack은 내부적으로 tapable을 사용하여 event-driven, plugin architecture를 구현하고 있다.
+- webpack은 컴파일러이며, 컴파일 과정에 존재하는 hook에 tap 함으로써 특정 시점에 임의의 역할을 수행하는 플러그인을 구현할 수 있다. webpack 자체도 여러 플러그인으로 이루어져 있다.
+- webpack의 핵심 구성요소들은 모두 tapable instance이며, Compiler, Compilation(Dependency Graph), ModuleFactory, Resolver, Parser, Template으로 구성되어 있다.
+- webpack의 컴파일 과정은 위 구성요소들이 상호작용하여 dependency graph를 만들어 가는 과정이다.
+
+다음 포스팅에서는 이러한 내용을 바탕으로 webpack 플러그인을 개발한 내용에 대해서 다루어 보겠습니다.
+
+# References
+
+- [Everything’s a Plugin: Understanding Webpack From the Inside Out](https://youtu.be/xse6JKcfbzs)
+- [Webpack Docs: Under the hood](https://webpack.js.org/concepts/under-the-hood/)
