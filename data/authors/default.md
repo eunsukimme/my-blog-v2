@@ -4,7 +4,7 @@ avatar: /static/images/avatar-me.jpg
 occupation: Software Engineer
 company: Grepp
 email: eunsu.dev@gmail.com
-twitter: https://twitter.com/EunsuKim17
+twitter: https://twitter.com/eunsukimme
 linkedin: https://www.linkedin.com/in/eunsukimme/
 github: https://github.com/eunsukimme
 ---

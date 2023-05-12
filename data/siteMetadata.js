@@ -12,7 +12,7 @@ const siteMetadata = {
   socialBanner: '/static/images/twitter-card.png',
   email: 'eunsu.dev@gmail.com',
   github: 'https://github.com/eunsukimme',
-  twitter: 'https://twitter.com/EunsuKim17',
+  twitter: 'https://twitter.com/eunsukimme',
   facebook: 'https://www.facebook.com/people/%EA%B9%80%EC%9D%80%EC%88%98/100003647254099/',
   // youtube: 'https://youtube.com',
   linkedin: 'https://www.linkedin.com/in/eunsukimme/',
