@@ -1,0 +1,98 @@
+---
+title: 'Webpack 플러그인 만들기(2) - Webpack 플러그인의 구조와 Hooks'
+summary: Webpack 플러그인을 만들기 위해 플러그인의 구조와 Hooks를 이해하고 간단한 플러그인 예제를 같이 살펴봅니다
+date: '2023-06-10T00:00:00.000Z'
+draft: false
+slug: 'making-webpack-plugin-2-plugin-structure-and-hooks'
+category: Frontend
+tags:
+  - Frontend
+  - javascript
+  - webpack
+socialImage: '/social_image.png'
+---
+
+지난 포스팅에서는 웹팩 플러그인을 만들게 된 배경과 웹팩의 내부 동작 원리에 대해 소개했다. 이번 포스팅에서는 웹팩 플러그인을 어떻게 작성하는지 간단히 소개하고, 내가 직접 만든 플러그인을 소개하도록 하겠다.
+
+# Webpack 플러그인의 구조
+
+웹팩 플러그인은 다음과 같이 `apply` 인스턴스 메소드를 갖는 클래스이다. 클래스뿐만 아니라 `apply` 프로토타입 메서드를 갖는 함수가 될 수도 있다.
+
+```jsx
+// hello-world.js
+class MyExampleWebpackPlugin {
+  apply(compiler) {
+    compiler.hooks.emit.tapAsync('MyExampleWebpackPlugin', (compilation, callback) => {
+      console.log('This is an example plugin!')
+      callback()
+    })
+  }
+}
+```
+
+웹팩 플러그인의 `apply` 메소드는 webpack이 컴파일할 때 호출되며, 이때 `compiler` 인스턴스를 파라미터로 받는다. 내부 코드에 대한 설명은 잠시 뒤로 미루고, 이 플러그인을 내 웹팩 설정에 적용하려면 다음과 같이 설정 파일을 작성하면 된다.
+
+```jsx
+// webpack.config.js
+const HelloWorldPlugin = require('hello-world')
+
+module.exports = {
+  // entry, output 등 설정...
+  plugins: [new HelloWorldPlugin()],
+}
+```
+
+정말 간단하지 않은가? `apply` 인스턴스 메서드를 갖는 클래스를 정의하고, 그걸 웹팩 설정 파일에서 `plugins`에 넣어주기만 하면 된다. 그런데 사실 위 플러그인은 그다지 유용하지 않다. 유용한 웹팩 플러그인을 만들기 위해선 내가 원하는 로직을 **언제 실행할지**도 정해주어야 한다.
+
+# Webpack hooks
+
+플러그인에 작성한 로직을 언제 실행할지 정하기 위해선 웹팩 hooks에 대해 이해해야 한다. 지난 포스팅에서 웹팩이 컴파일 과정에서 실행되는 여러 단계의 hooks를 제공한다는 것을 보았다. 바로 위에서 예시로 든 플러그인은 [compiler hooks](https://webpack.kr/api/compiler-hooks/) 중 [`emit`](https://webpack.kr/api/compiler-hooks/#emit) hook을 적용한 케이스로, 이 훅은 웹팩 컴파일이 끝나고 그 결과물을 output 디렉터리로 방출(emit)하기 직전에 해당하는 hook이다. 웹팩은 `emit` 외에도 여러 compiler hooks를 제공하고 있다. 내가 하고자 하는 게 무엇인지에 따라 어떤 hooks를 사용할지 판단해야 한다.
+
+어떤 hooks 사용할지 정했다면, 해당 hook이 `SyncHook`인지, `AsyncHook`인지 확인해야 한다. 왜냐하면 이것에 따라서 tap 하는 메서드가 달라진다. SyncHook 이라면 `tap` 메서드로, AsyncHook 이라면 `tap` / `tapAsync` / `tapPromise` 메서드로 태핑할 수 있다.
+
+# Build my own Webpack Plugin
+
+자, 웹팩 플러그인의 구조를 간단히 알아보았으니 이제 내가 당면한 문제를 해결해 줄 웹팩 플러그인을 만들어 보자. 지난 포스팅에서 언급했다시피 나는 주어진 entry point로부터 실제로 사용된 소스 코드만을 동일한 디렉터리 구조로 출력하고자 했었다. 이를 위해 플러그인을 만들었고, 플러그인 코드는 다음과 같다.
+
+```js
+const fs = require('fs/promises')
+const path = require('path')
+
+class EmitDependenciesPlugin {
+  constructor(options = {}) {
+    this.outputPath = options.outputPath || 'output'
+  }
+
+  apply(compiler) {
+    compiler.hooks.emit.tapPromise('EmitDependenciesPlugin', async (compilation) => {
+      const { fileDependencies, compiler } = compilation
+      const rootDir = compiler.context
+      const outputPath = path.resolve(rootDir, this.outputPath)
+
+      const nodeModulesPath = path.resolve(rootDir, 'node_modules')
+      const mainDependencies = Array.from(fileDependencies).filter(
+        (fileAbsPath) => !fileAbsPath.startsWith(nodeModulesPath)
+      )
+
+      await Promise.all(mainDependencies.map((filepath) => copyFile(rootDir, outputPath, filepath)))
+    })
+  }
+}
+
+module.exports = { EmitDependenciesPlugin }
+```
+
+코드를 살펴보면, 우선 `EmitDependenciesPlugin` 이라는 클래스를 정의하고 `outputPath` 옵션을 받을 수 있도록 했다. `apply` 함수에선 compiler hooks 중 `emit` hook에 탭 함으로써 소스 코드 분석을 완료하고 에셋을 방출하기 직전에 로직을 실행하도록 하였다. 이때 `emit` hook은 AsyncSeriesHook 이므로 `tapPromise` 함수를 호출하였다. 그러면 `compilation` 의 `fileDependencies` 는 entry point에 의해 참조되는 파일들의 절대경로를 포함한 Set이 된다. 이 Set에는 node_modules 폴더에 있는 라이브러리도 포함되어 있는데, 나는 해당 파일들까지는 신경 쓰고 싶지 않아서 필터링을 한번 해줬다.
+
+그리하여 오직 내가 작성한 소스 코드만을 대상으로 `copyFile` 함수를 돌려서 해당 파일을 option으로 받은 `outputPath` 로 출력하여 뽑아냈다. 전체 코드는 [Github 레포지토리](https://github.com/eunsukimme/emit-deps-webpack-plugin)에서 확인할 수 있고, [npm 패키지](https://www.npmjs.com/package/emit-deps-webpack-plugin)로 퍼블리시 되어 있어서 install 받아 직접 사용해 볼 수 있다.
+
+# Recap
+
+이번 포스팅에서 다룬 내용은 다음과 같다.
+
+- Webpack 플러그인은 `apply` 인스턴스 메서드를 가진 클래스 또는 프로토타입 메서드를 가진 함수이다.
+- Webpack 플러그인은 웹팩 설정 파일의 `plugins` 옵션으로 추가해 줌으로써 적용할 수 있다.
+- Webpack 컴파일 과정에서 실행되는 여러 hooks가 존재하고, hooks는 Sync/Async 에 따라 태핑 메서드가 다를 수 있다.
+- Webpack compiler hooks 중 emit hook은 컴파일이 완료되어 에셋을 출력하기 전에 실행되는 hook이다. 이때 `compilation` 의 `fileDependencies` 로부터 entry point로 부터 참조된 dependencies 들을 알 수 있다.
+
+이렇게 하여 Webpack 플러그인 만들기 시리즈를 마친다. Webpack 플러그인을 만들면서 Webpack이 어떻게 구현되어 있는지 많이 들여다보게 되었는데, 구현(technical details)을 자세히 아는 걸 그리 좋아하진 않지만, event-driven, plugin system을 잘 구현한 구현체인 것 같아 꽤 공부가 되었다. 또 번들러의 기본 동작을 이해하는 데에도 조금은 도움이 된 것 같다. 다른 번들러 플러그인도 만들어 볼 기회가 생기면 좋겠다.
