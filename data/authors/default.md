@@ -2,7 +2,7 @@
 name: Eunsu Kim
 avatar: /static/images/avatar-me.jpg
 occupation: Software Engineer
-company: Grepp
+company: Karrot
 email: eunsu.dev@gmail.com
 twitter: https://twitter.com/eunsukimme
 linkedin: https://www.linkedin.com/in/eunsukimme/
